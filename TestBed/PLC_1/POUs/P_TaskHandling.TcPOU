@@ -1,0 +1,803 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="P_TaskHandling" Id="{7d4036fb-bc78-45ef-ba00-c501dee2fa25}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM P_TaskHandling
+VAR
+	// Robot task status informaiton
+	// UR3
+	fbUR3TaskStatusInfo : FB_mbReadRobotTaskStatusInfo := (Robot := 'UR3');
+	stUR3TaskStatus : ST_RobotTaskStatusInfo;
+	// UR5
+	fbUR5TaskStatusInfo : FB_mbReadRobotTaskStatusInfo := (Robot := 'UR5');
+	stUR5TaskStatus : ST_RobotTaskStatusInfo;
+	
+	// Task Triggers
+	StopAssignment_ftrig : F_TRIG;
+	// UR3
+	UR3TaskActive_rtrig : R_TRIG; // Task assigned (including positioning movements)
+	UR3TaskComplete_ftrig : F_TRIG; // Task reported complete
+	UR3ActionStart_rtrig : R_TRIG; // robot positioning for task over, part interaction begins
+	UR3ActionComplete_ftrig : F_TRIG; // part interaction ends
+	//UR5
+	UR5TaskActive_rtrig : R_TRIG; // Task assigned (including positioning movements)
+	UR5TaskComplete_ftrig : F_TRIG; // Task reported complete
+	UR5ActionStart_rtrig : R_TRIG; // robot positioning for task over, part interaction begins
+	UR5ActionComplete_ftrig : F_TRIG; // part interaction ends
+	
+	// General use indexes and counters
+	nMaxTimeInWF : REAL;
+	nWorkFixtureIndex : INT;
+	nInputFixtureIndex : INT;
+	nOutputFixtureIndex : INT;
+	
+	// UR3 Task State Macine
+	eUR3TaskState : E_RobotTaskStates;
+	
+	// UR3 Active Task Targets
+	nUR3TargetWorkFixtureIndex : INT;
+	nUR3TargetWorkframe : WORD;
+	nUR3TargetTask : WORD;
+	nUR3TargetPart : WORD;
+	
+	// UR5 Task State Macine
+	eUR5TaskState : E_RobotTaskStates;
+	
+	// UR5 Active Task Targets
+	nUR5TargetWorkFixtureIndex : INT;
+	nUR5TargetInputFixtureIndex : INT;
+	nUR5TargetOutputFixtureIndex : INT;
+	nUR5TargetPickFrame : WORD;
+	nUR5TargetPlaceFrame : WORD;
+	nUR5TargetTask: WORD; // 1 for input 2 for output
+	sUR5TargetTask: STRING;
+	nUR5TargetPart : WORD;
+	
+	// Task writing functionblocks
+	fbWriteUR3Task : FB_mbWriteRobotTask := (Robot := 'UR3');
+	fbWriteUR5Task : FB_mbWriteRobotTask := (Robot := 'UR5');
+	fbUR3Resume : FB_mbWriteSingleReg := (Robot := 'UR3', Register := 145, Value := 1);
+	fbUR5Resume : FB_mbWriteSingleReg := (Robot := 'UR5', Register := 145, Value := 1);
+	
+	// Position Check variables
+	bPosCheckNext : BOOL;
+	nTaskType: INT := 1;
+	bPosCheckAssignedUR3: BOOL;
+	bPosCheckAssignedUR5: BOOL;
+	bPosCheckCompleteUR3: BOOL;
+	bPosCheckCompleteUR5: BOOL;
+	nUR3PosCheckIndex : UINT := 1;
+	nUR5PosCheckIndex : UINT := 1;
+	
+	bTestWait: BOOL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(* =======================================================
+Update veriables on every cycle
+Multiple states are calculated on each cycle to aid in task assignment and tracking
+======================================================= *)
+// Update Task Status Information
+fbUR3TaskStatusInfo(stTaskStatusInfo => stUR3TaskStatus);
+fbUR5TaskStatusInfo(stTaskStatusInfo => stUR5TaskStatus);
+
+// Triggers and Event Tracking
+// Position Check Triggers
+	IF Global.bEnablePosCheck THEN
+		IF Global.bForcePosCheck OR Global.nPartsSincePosCheck >= Global.nPosCheckThreshold THEN
+			bPosCheckNext := TRUE;
+		END_IF
+	END_IF
+	// Reset Pos Check founter if it has been assigned for both robots
+	IF bPosCheckCompleteUR3 AND bPosCheckCompleteUR5 THEN
+		// if required trigger post check processing here
+		Global.nPartsSincePosCheck := 0;
+		bPosCheckAssignedUR3 := FALSE;
+		bPosCheckAssignedUR5 := FALSE;
+		bPosCheckCompleteUR3 := FALSE;
+		bPosCheckCompleteUR5 := FALSE;
+		bPosCheckNext := FALSE;
+		Global.bForcePosCheck := FALSE;
+	END_IF
+// Stop Process Triggers
+	StopAssignment_ftrig(CLK := Global.bActivateTaskAssignment);
+	// Global interrupt
+	// Interrupts
+	IF StopAssignment_ftrig.Q THEN
+		IF eUR3TaskState = E_RobotTaskStates.TaskSelection OR eUR3TaskState = E_RobotTaskStates.TaskTypeSelection THEN
+			eUR3TaskState := E_RobotTaskStates.Idle;
+		END_IF
+		IF eUR5TaskState = E_RobotTaskStates.TaskSelection OR eUR5TaskState = E_RobotTaskStates.TaskTypeSelection THEN
+			eUR5TaskState := E_RobotTaskStates.Idle;
+		END_IF
+	END_IF
+//UR3 Task Triggers
+	// Watch for UR3 task to be assigned
+	UR3TaskActive_rtrig(CLK := stUR3TaskStatus.bInTask);
+	// Watch for UR3 task to complete
+	UR3TaskComplete_ftrig(CLK := stUR3TaskStatus.bInTask);
+	// Watch for UR3 to start task action
+	UR3ActionStart_rtrig(CLK := stUR3TaskStatus.bPerformingTaskAction);
+	// Watch for UR3 to complete task action
+	UR3ActionComplete_ftrig(CLK := stUR3TaskStatus.bPerformingTaskAction);
+//UR5 Task Triggers
+	// Watch for UR3 task to be assigned
+	UR5TaskActive_rtrig(CLK := stUR5TaskStatus.bInTask);
+	// Watch for UR3 task to complete
+	UR5TaskComplete_ftrig(CLK := stUR5TaskStatus.bInTask);
+	// Watch for UR3 to start task action
+	UR5ActionStart_rtrig(CLK := stUR5TaskStatus.bPerformingTaskAction);
+	// Watch for UR3 to complete task action
+	UR5ActionComplete_ftrig(CLK := stUR5TaskStatus.bPerformingTaskAction);
+
+// Calcualte part Time in Fixture
+// Cycle through every workfixture
+FOR nWorkFixtureIndex := 1 TO Global.nNumWorkFixtures DO
+	// Calculate part times on every loop
+	IF Global.arrWorkFixtures[nWorkFixtureIndex].stPart.bExists THEN
+		Global.arrWorkFixtures[nWorkFixtureIndex].stPart.ntTimeInWorkfixture := 
+			(Global.nCurrentTime - Global.arrWorkFixtures[nWorkFixtureIndex].stPart.ntInputPartPlaced)/10000000;
+	ELSE
+		Global.arrWorkFixtures[nWorkFixtureIndex].stPart.ntTimeInWorkfixture := 0;
+	END_IF
+END_FOR
+
+// Update task type strings for visualization
+IF eUR5TaskState = E_RobotTaskStates.TaskExecution THEN
+	IF nUR5TargetTask = 1 THEN
+		sUR5TargetTask := 'Input';
+	ELSIF nUR5TargetTask = 2 THEN
+		sUR5TargetTask := 'Output';
+	END_IF
+ELSE
+	sUR5TargetTask := 'N/A';
+END_IF
+
+
+(* =======================================================
+A state machine is used to handle the task state of the UR3 robot.
+	Possible states include:
+		- Idle - wait until process is in a mode to execute tasks
+		- Task Type Selection - this is used to select between a drawing task or a measurement task. More can be added in the future
+		- Task Selection - if no task is being executed, assesing if a task should be assigned
+		- Task Assignment - packaging a task and transmititng it to the robot
+		- Task Assignment Wait - waiting for task to be written to robot
+		- Task Execution - waiting for robot to complete assigned task before going back to Idle
+======================================================= *)
+CASE eUR3TaskState OF
+	E_RobotTaskStates.Idle: // Decides what to do based on system mode
+		IF Global.bActivateTaskAssignment AND Global_Safety.UR3RedIND THEN
+			eUR3TaskState := E_RobotTaskStates.TaskTypeSelection;
+		END_IF
+		// Reset Targets
+		nUR3TargetWorkFixtureIndex := 0;
+		nUR3TargetWorkframe := 0;
+		nUR3TargetTask := 0;
+		Global.bUR3InTask := FALSE;
+	E_RobotTaskStates.TaskTypeSelection: // Should a position check test be performed
+		IF bPosCheckNext AND NOT Global.bUR5InTask THEN
+			IF NOT Global.bPosSensorReserved AND NOT bPosCheckCompleteUR3 THEN
+				// Set Task Variables 
+				nUR3TargetTask := 0; // 0 for Pos Check Program on robots
+				Global.bPosSensorReserved := TRUE;
+				bPosCheckAssignedUR3 := TRUE;
+				nUR3PosCheckIndex := 1; // Index Value for Assignment of Sensor Inputs - Reset to 1
+				eUR3TaskState := E_RobotTaskStates.TaskAssignment;
+			END_IF
+		ELSIF NOT bPosCheckNext THEN // else check if a different task that can be assigned
+			// If a part exists and is not complete move to task selection
+			IF Global.arrWorkFixtures[1].stPart.bExists AND NOT Global.arrWorkFixtures[1].stPart.bComplete THEN // If WF1 has a part that is not complete
+				eUR3TaskState := E_RobotTaskStates.TaskSelection;
+			ELSIF  Global.arrWorkFixtures[2].stPart.bExists AND NOT Global.arrWorkFixtures[2].stPart.bComplete THEN
+				eUR3TaskState := E_RobotTaskStates.TaskSelection;
+			END_IF
+		END_IF
+	E_RobotTaskStates.TaskSelection: // Monitoring and deciding if a task should be assigned
+		// Reset MaxPartLagTime to help find longest lag time
+		nMaxTimeInWF := 0;
+		// Reset Targets
+		nUR3TargetWorkFixtureIndex := 0;
+		nUR3TargetWorkframe := 0;
+		nUR3TargetTask := 0;
+		// For each possible active workfixture
+		FOR nWorkFixtureIndex := 1 TO Global.nNumWorkFixtures DO
+			// If statement to identify if fixture/part can be worked on
+			IF 	Global.arrWorkFixtures[nWorkFixtureIndex].stPart.bExists // part exists
+			AND	NOT Global.arrWorkFixtures[nWorkFixtureIndex].stPart.bComplete // part not complete
+			AND	NOT Global.arrWorkFixtures[nWorkFixtureIndex].bReserved THEN // fixture not reserved
+				// Check to see if identified eligable part has been waiting the longest
+				IF Global.arrWorkFixtures[nWorkFixtureIndex].stPart.ntTimeInWorkfixture > nMaxTimeInWF THEN
+					// update max part lag time
+					nMaxTimeInWF := Global.arrWorkFixtures[nWorkFixtureIndex].stPart.ntTimeInWorkfixture;
+					// Record task, workframe and workfixture index
+					nUR3TargetWorkframe := Global.arrWorkFixtures[nWorkFixtureIndex].nWorkframe;
+					nUR3TargetPart := Global.arrWorkFixtures[nWorkFixtureIndex].stPart.nPartNumber;
+					nUR3TargetWorkFixtureIndex := nWorkFixtureIndex;
+					// if a viable target is found assign task
+					eUR3TaskState := E_RobotTaskStates.TaskAssignment;
+				END_IF
+			END_IF
+		END_FOR
+		
+		// Choose Task number 
+		nUR3TargetTask := Global.nActiveUR3Task + 1; // 1 added for array indexing on radio button visu (starts at 0)
+		(*
+		FOR FUTURE VERSIONS - IF TASK IS TIED TO PART TYPE 
+		Part type is stored in the following locaiton:
+		Global.arrWorkFixtures[nUR3TargetWorkFixtureIndex].stPart.nPartType;
+		*)
+		
+	E_RobotTaskStates.TaskAssignment: // Transmitting task to robot
+		Global.bUR3InTask := TRUE;
+		(* This section has two parts. 1) PLC handling and part tracking and 2) handling assignment to robot. *)
+		// PLC Handling
+		Global.arrWorkFixtures[nUR3TargetWorkFixtureIndex].bReserved := TRUE;
+		
+		// Robot Assignment Setup Handling
+		fbWriteUR3Task.Task := nUR3TargetTask;
+		fbWriteUR3Task.Workframe1 := nUR3TargetWorkframe;
+		fbWriteUR3Task.PartNumber := nUR3TargetPart;
+		fbWriteUR3Task.bExecute := TRUE;
+		
+		// Advance to waiting for assignment completion
+		eUR3TaskState := E_RobotTaskStates.TaskAssignment_Wait;
+	
+	E_RobotTaskStates.TaskAssignment_Wait: 	// Waiting for task to be written
+		IF NOT fbWriteUR3Task.bBusy THEN
+			fbWriteUR3Task.bExecute :=FALSE;
+			// record task assignment
+			Global.arrWorkFixtures[nUR3TargetWorkFixtureIndex].stPart.ntTaskAssigned := Global.nCurrentTime;
+			// change states
+			eUR3TaskState := E_RobotTaskStates.TaskExecution;
+		END_IF
+			
+	E_RobotTaskStates.TaskExecution: // Monitoring for completion of task
+		// Recording Time at events
+		IF UR3ActionStart_rtrig.Q THEN
+			IF nUR3TargetTask = 0 THEN
+				// record IO state here
+				Global.UR3PosCheck[nUR3PosCheckIndex] := Global.bPosSensorState;
+				nUR3PosCheckIndex := nUR3PosCheckIndex + 1;
+				// tell robot to resume task
+				fbUR3Resume.bExecute := TRUE;
+			ELSE
+				Global.arrWorkFixtures[nUR3TargetWorkFixtureIndex].stPart.ntTaskActionStart := Global.nCurrentTime;
+			END_IF
+		END_IF
+		
+		IF UR3ActionComplete_ftrig.Q THEN
+			IF nUR3TargetTask = 0 THEN
+				; // do noting
+			ELSE
+				Global.arrWorkFixtures[nUR3TargetWorkFixtureIndex].stPart.ntTaskActionComplete := Global.nCurrentTime;
+			END_IF
+		END_IF
+		
+		IF UR3TaskComplete_ftrig.Q THEN
+			IF nUR3TargetTask = 0 THEN // If task completed was a pos check
+				bPosCheckCompleteUR3 := TRUE;
+				Global.bPosSensorReserved := FALSE;
+				// (FOR UR integrated sensor) Global.UR3PosCheck := F_Word_To_16Bool(stUR3TaskStatus.nPosCheckValue);
+			ELSE
+				Global.arrWorkFixtures[nUR3TargetWorkFixtureIndex].stPart.bComplete := TRUE;
+				Global.arrWorkFixtures[nUR3TargetWorkFixtureIndex].bReserved := FALSE;
+				// Record Complete
+				Global.arrWorkFixtures[nUR3TargetWorkFixtureIndex].stPart.ntTaskComplete := Global.nCurrentTime;
+			END_IF
+			// Go back to idle state
+			eUR3TaskState := E_RobotTaskStates.Idle;
+		END_IF
+END_CASE
+
+(* =======================================================
+UR5
+A state machine is used to handle the task state of the UR5 robot.
+	Possible states include:
+		- Idle - wait until process is in a mode to execute tasks
+		- Task Selection - if no task is being executed, assesing if a task should be assigned
+		- Task Assignment - packaging a task and transmititng it to the robot
+		- Task Assignment Wait - waiting for task to be written to robot
+		- Task Execution - waiting for robot to complete assigned task before going back to Idle
+======================================================= *)
+CASE eUR5TaskState OF
+	E_RobotTaskStates.Idle: // Decides what to do based on system mode
+		IF Global.bActivateTaskAssignment AND Global_Safety.UR5RedIND THEN
+			eUR5TaskState := E_RobotTaskStates.TaskTypeSelection;
+		END_IF
+		// Reset Targets
+		nUR5TargetWorkFixtureIndex := 0;
+		nUR5TargetInputFixtureIndex := 0;
+		nUR5TargetOutputFixtureIndex := 0;
+		nUR5TargetPickFrame := 0;
+		nUR5TargetPlaceFrame := 0;
+		nUR5TargetTask := 0;
+		nMaxTimeInWF := 0;
+		Global.bUR5InTask := FALSE;
+	E_RobotTaskStates.TaskTypeSelection: // Should a position check test be performed
+		IF bPosCheckNext AND NOT Global.bUR3InTask THEN
+			// Choose Task number 
+			IF NOT Global.bPosSensorReserved AND NOT bPosCheckCompleteUR5 THEN
+				nUR5TargetTask := 0; // 0 for Pos Check Program on robots
+				Global.bPosSensorReserved := TRUE;
+				bPosCheckAssignedUR5 := TRUE;
+				nUR5PosCheckIndex := 1; // Index Value for Assignment of Sensor Inputs - Reset to 1
+				eUR5TaskState := E_RobotTaskStates.TaskAssignment;
+			END_IF
+		ELSIF NOT bPosCheckNext THEN  
+			// else it is a different task that must be assigned
+			// If an input part exists or a complete part exists
+			IF Global.arrInputFixtures[1].stPart.bExists OR Global.arrWorkFixtures[1].stPart.bComplete OR Global.arrWorkFixtures[2].stPart.bComplete THEN 
+				eUR5TaskState := E_RobotTaskStates.TaskSelection;
+			END_IF
+		END_IF
+	E_RobotTaskStates.TaskSelection: // Monitoring and deciding if a task should be assigned
+		// OUTPUT - Find possible part OUTPUTS
+		nUR5TargetPickFrame := 0;
+		nUR5TargetPlaceFrame := 0;
+		// For each possible active workfixture
+		FOR nWorkFixtureIndex := 1 TO Global.nNumWorkFixtures DO
+			IF Global.arrWorkFixtures[nWorkFixtureIndex].stPart.bExists // part exists
+			AND Global.arrWorkFixtures[nWorkFixtureIndex].stPart.bComplete // part is complete (ready for output)
+			AND NOT Global.arrWorkFixtures[nWorkFixtureIndex].bReserved THEN // fixture is not reserved
+				// Determine if it has been waiting the longest (FIFO)
+				IF Global.arrWorkFixtures[nWorkFixtureIndex].stPart.ntTimeInWorkfixture > nMaxTimeInWF THEN
+					// update max part lag time
+					nMaxTimeInWF := Global.arrWorkFixtures[nWorkFixtureIndex].stPart.ntTimeInWorkfixture;
+					// Record task, workframe and workfixture index
+					nUR5TargetWorkFixtureIndex := nWorkFixtureIndex;
+					nUR5TargetPart := Global.arrWorkFixtures[nWorkFixtureIndex].stPart.nPartNumber;
+					nUR5TargetPickFrame := Global.arrWorkFixtures[nWorkFixtureIndex].nWorkframe;
+				END_IF
+			END_IF
+		END_FOR
+		// For each possible output fixture
+		FOR nOutputFixtureIndex := 1 TO Global.nNumOutputFixtures DO
+			// find first available input part (in order, NO FIFO)
+			IF NOT Global.arrOutputFixtures[nOutputFixtureIndex].stPart.bExists THEN
+				// Record target information
+				nUR5TargetOutputFixtureIndex := nOutputFixtureIndex;
+				nUR5TargetPlaceFrame := Global.arrOutputFixtures[nOutputFixtureIndex].nWorkframe;
+				// if a viable target is found assign task
+			END_IF
+			IF nUR5TargetPlaceFrame > 0 THEN
+					// exit for loop
+					EXIT;
+			END_IF
+		END_FOR
+		// assign task type if a task was found
+		IF nUR5TargetPickFrame <> 0 AND nUR5TargetPlaceFrame <> 0 THEN // pick and place found
+			nUR5TargetTask := 2; // 2 for output task
+			eUR5TaskState := E_RobotTaskStates.TaskAssignment;
+		END_IF
+		// INPUT - If output is not assigned find possible INPUTS
+		
+		IF nUR5TargetTask <> 2 THEN
+			nUR5TargetPickFrame := 0;
+			nUR5TargetPlaceFrame := 0;
+			// check if each work fixture is empty
+			FOR nWorkFixtureIndex := 1 TO Global.nNumWorkFixtures DO
+				IF NOT Global.arrWorkFixtures[nWorkFixtureIndex].stPart.bExists // no part in fixture
+				AND NOT Global.arrWorkFixtures[nWorkFixtureIndex].bReserved THEN // fixture is not reserved
+					// record target informaiton
+					nUR5TargetWorkFixtureIndex := nWorkFixtureIndex;
+					nUR5TargetPlaceFrame := Global.arrWorkFixtures[nWorkFixtureIndex].nWorkframe;
+				END_IF
+				IF nUR5TargetPlaceFrame > 0 THEN
+					// exit for loop
+					EXIT;
+				END_IF
+			END_FOR
+			// check for available part in input
+			FOR nInputFixtureIndex := 1 TO Global.nNumInputFixtures DO
+				// find first available input part (in order, NO FIFO)
+				IF 	Global.arrInputFixtures[nInputFixtureIndex].stPart.bExists THEN
+					// Record target information
+					nUR5TargetInputFixtureIndex := nInputFixtureIndex;
+					nUR5TargetPart := Global.arrInputFixtures[nInputFixtureIndex].stPart.nPartNumber;
+					nUR5TargetPickFrame := Global.arrInputFixtures[nInputFixtureIndex].nWorkframe;
+				END_IF
+				IF nUR5TargetPickFrame > 0 THEN
+					// exit for loop
+					EXIT;
+				END_IF
+			END_FOR
+			// check if task was assigned
+			IF nUR5TargetPickFrame <> 0 AND nUR5TargetPlaceFrame <> 0 THEN
+				nUR5TargetTask := 1; // 1 for input task
+				eUR5TaskState := E_RobotTaskStates.TaskAssignment;
+			END_IF
+		END_IF
+	E_RobotTaskStates.TaskAssignment: // Transmitting task to robot
+		(* This section has two parts. 1) handling PLC tracking side and 2) handling assignment to robot. *)
+		// PLC Handling
+		Global.bUR5InTask  := TRUE;
+		IF nUR5TargetTask = 1 THEN // If input task
+			Global.arrInputFixtures[nUR5TargetInputFixtureIndex].bReserved := TRUE;
+			// Record task information
+			Global.arrInputFixtures[nUR5TargetInputFixtureIndex].stPart.nInputPosition := nUR5TargetPickFrame;
+			Global.arrInputFixtures[nUR5TargetInputFixtureIndex].stPart.nWorkFixture := nUR5TargetPlaceFrame;
+		ELSIF nUR5TargetTask = 2 THEN // If output task
+			Global.arrOutputFixtures[nUR5TargetOutputFixtureIndex].bReserved := TRUE;
+			// Record task information
+			Global.arrWorkFixtures[nUR5TargetWorkFixtureIndex].stPart.nOutputPosition := nUR5TargetPlaceFrame;
+		END_IF
+		
+		Global.arrWorkFixtures[nUR5TargetWorkFixtureIndex].bReserved := TRUE;
+		
+		
+		// Robot Assignment Setup Handling
+		fbWriteUR5Task.Task := nUR5TargetTask;
+		fbWriteUR5Task.Workframe1 := nUR5TargetPickFrame;
+		fbWriteUR5Task.Workframe2 := nUR5TargetPlaceFrame;
+		fbWriteUR5Task.PartNumber := nUR5TargetPart;
+		fbWriteUR5Task.bExecute := TRUE;
+		
+		// Advance to waiting for assignment completion
+		eUR5TaskState := E_RobotTaskStates.TaskAssignment_Wait;
+	
+	E_RobotTaskStates.TaskAssignment_Wait: 	// Waiting for task to be written
+		IF NOT fbWriteUR5Task.bBusy THEN
+			fbWriteUR5Task.bExecute :=FALSE;
+			// record assignment time
+			IF nUR5TargetTask = 1 THEN // If input task
+				Global.arrInputFixtures[nUR5TargetInputFixtureIndex].stPart.ntPickFromInputAssigned := Global.nCurrentTime;
+			ELSIF nUR5TargetTask = 2 THEN // If output task
+				Global.arrWorkFixtures[nUR5TargetWorkFixtureIndex].stPart.ntPickFromWFAssigned := Global.nCurrentTime;
+			END_IF
+			
+			// change states
+			eUR5TaskState := E_RobotTaskStates.TaskExecution;
+		END_IF
+			
+	E_RobotTaskStates.TaskExecution: // Monitoring for completion of task
+		// Handle task events
+		IF UR5ActionStart_rtrig.Q THEN // when action starts
+			IF nUR5TargetTask = 0 THEN
+				// record IO state here
+				Global.UR5PosCheck[nUR5PosCheckIndex] := Global.bPosSensorState;
+				nUR5PosCheckIndex := nUR5PosCheckIndex + 1;
+				// tell robot to resume task
+				fbUR5Resume.bExecute := TRUE;
+			// record Action start time and handle part movement
+			ELSIF nUR5TargetTask = 1 THEN // If input task
+				Global.arrInputFixtures[nUR5TargetInputFixtureIndex].stPart.ntInputPartPicked := Global.nCurrentTime;
+				Global.stPartInTransit := Global.arrInputFixtures[nUR5TargetInputFixtureIndex].stPart;
+				Global.arrInputFixtures[nUR5TargetInputFixtureIndex].stPart := Global.stNullPart;
+			ELSIF nUR5TargetTask = 2 THEN // If output task
+				Global.arrWorkFixtures[nUR5TargetWorkFixtureIndex].stPart.ntOutputPartPicked := Global.nCurrentTime;
+				Global.stPartInTransit := Global.arrWorkFixtures[nUR5TargetWorkFixtureIndex].stPart;
+				Global.arrWorkFixtures[nUR5TargetWorkFixtureIndex].stPart := Global.stNullPart;
+			END_IF
+		END_IF
+		IF UR5ActionComplete_ftrig.Q THEN
+			IF nUR5TargetTask = 0 THEN
+				; // do noting
+			// record Action Complete time and handle part movement
+			ELSIF nUR5TargetTask = 1 THEN // If input task
+				Global.arrWorkFixtures[nUR5TargetWorkFixtureIndex].stPart := Global.stPartInTransit;
+				Global.arrWorkFixtures[nUR5TargetWorkFixtureIndex].stPart.ntInputPartPlaced := Global.nCurrentTime;
+				Global.stPartInTransit := Global.stNullPart;
+			ELSIF nUR5TargetTask = 2 THEN // If output task
+				Global.arrOutputFixtures[nUR5TargetOutputFixtureIndex].stPart := Global.stPartInTransit;
+				Global.arrOutputFixtures[nUR5TargetOutputFixtureIndex].stPart.ntOutputPartPlaced := Global.nCurrentTime;
+				Global.stPartInTransit := Global.stNullPart;
+			END_IF
+		END_IF
+		
+		IF UR5TaskComplete_ftrig.Q THEN
+			// record Action Complete time and handle part movement
+			IF nUR5TargetTask = 0 THEN // If task completed was a pos check
+				bPosCheckCompleteUR5 := TRUE;
+				Global.bPosSensorReserved := FALSE;
+				// Global.UR5PosCheck := F_Word_To_16Bool(stUR5TaskStatus.nPosCheckValue);
+			ELSIF nUR5TargetTask = 1 THEN // If input task
+				Global.arrWorkFixtures[nUR5TargetWorkFixtureIndex].stPart.ntPlaceInWFComplete := Global.nCurrentTime;
+				Global.arrWorkFixtures[nUR5TargetWorkFixtureIndex].bReserved := FALSE;
+				Global.arrInputFixtures[nUR5TargetInputFixtureIndex].bReserved := FALSE;
+			ELSIF nUR5TargetTask = 2 THEN // If output task
+				Global.arrOutputFixtures[nUR5TargetOutputFixtureIndex].stPart.ntPlaceInOutputComplete := Global.nCurrentTime;
+				Global.arrOutputFixtures[nUR5TargetOutputFixtureIndex].bReserved := FALSE;
+				Global.arrWorkFixtures[nUR5TargetWorkFixtureIndex].bReserved := FALSE;
+				// Pos Check Part Counting
+				Global.nPartsSincePosCheck := Global.nPartsSincePosCheck + 1;
+			END_IF
+			// Go back to idle state
+			eUR5TaskState := E_RobotTaskStates.Idle;
+		END_IF
+END_CASE
+
+(* =======================================================
+Function block Calls
+======================================================= *)
+fbWriteUR3Task();
+fbWriteUR5Task();
+fbUR3Resume();
+fbUR5Resume();]]></ST>
+    </Implementation>
+    <LineIds Name="P_TaskHandling">
+      <LineId Id="275" Count="0" />
+      <LineId Id="277" Count="0" />
+      <LineId Id="276" Count="0" />
+      <LineId Id="184" Count="0" />
+      <LineId Id="305" Count="0" />
+      <LineId Id="567" Count="0" />
+      <LineId Id="302" Count="0" />
+      <LineId Id="556" Count="0" />
+      <LineId Id="1520" Count="1" />
+      <LineId Id="1546" Count="0" />
+      <LineId Id="1523" Count="0" />
+      <LineId Id="1547" Count="0" />
+      <LineId Id="1524" Count="0" />
+      <LineId Id="1540" Count="1" />
+      <LineId Id="1572" Count="0" />
+      <LineId Id="1542" Count="2" />
+      <LineId Id="1906" Count="0" />
+      <LineId Id="1905" Count="0" />
+      <LineId Id="1672" Count="0" />
+      <LineId Id="1822" Count="0" />
+      <LineId Id="1545" Count="0" />
+      <LineId Id="1519" Count="0" />
+      <LineId Id="568" Count="0" />
+      <LineId Id="577" Count="2" />
+      <LineId Id="929" Count="2" />
+      <LineId Id="580" Count="0" />
+      <LineId Id="932" Count="1" />
+      <LineId Id="581" Count="0" />
+      <LineId Id="569" Count="0" />
+      <LineId Id="557" Count="0" />
+      <LineId Id="335" Count="0" />
+      <LineId Id="340" Count="1" />
+      <LineId Id="318" Count="0" />
+      <LineId Id="320" Count="1" />
+      <LineId Id="342" Count="0" />
+      <LineId Id="558" Count="8" />
+      <LineId Id="312" Count="0" />
+      <LineId Id="303" Count="0" />
+      <LineId Id="278" Count="0" />
+      <LineId Id="176" Count="0" />
+      <LineId Id="224" Count="0" />
+      <LineId Id="180" Count="0" />
+      <LineId Id="177" Count="0" />
+      <LineId Id="179" Count="0" />
+      <LineId Id="181" Count="2" />
+      <LineId Id="178" Count="0" />
+      <LineId Id="279" Count="1" />
+      <LineId Id="1059" Count="1" />
+      <LineId Id="1062" Count="3" />
+      <LineId Id="1067" Count="1" />
+      <LineId Id="1066" Count="0" />
+      <LineId Id="1347" Count="0" />
+      <LineId Id="1349" Count="0" />
+      <LineId Id="123" Count="0" />
+      <LineId Id="281" Count="0" />
+      <LineId Id="126" Count="0" />
+      <LineId Id="283" Count="0" />
+      <LineId Id="1188" Count="0" />
+      <LineId Id="127" Count="1" />
+      <LineId Id="282" Count="0" />
+      <LineId Id="129" Count="3" />
+      <LineId Id="271" Count="2" />
+      <LineId Id="993" Count="1" />
+      <LineId Id="988" Count="1" />
+      <LineId Id="1897" Count="0" />
+      <LineId Id="1189" Count="1" />
+      <LineId Id="1210" Count="0" />
+      <LineId Id="1586" Count="0" />
+      <LineId Id="1526" Count="0" />
+      <LineId Id="1364" Count="0" />
+      <LineId Id="1377" Count="0" />
+      <LineId Id="1671" Count="0" />
+      <LineId Id="1895" Count="1" />
+      <LineId Id="1204" Count="0" />
+      <LineId Id="1531" Count="0" />
+      <LineId Id="1454" Count="0" />
+      <LineId Id="1819" Count="0" />
+      <LineId Id="1818" Count="0" />
+      <LineId Id="1530" Count="0" />
+      <LineId Id="1528" Count="0" />
+      <LineId Id="1192" Count="0" />
+      <LineId Id="270" Count="0" />
+      <LineId Id="168" Count="0" />
+      <LineId Id="188" Count="0" />
+      <LineId Id="992" Count="0" />
+      <LineId Id="997" Count="0" />
+      <LineId Id="990" Count="1" />
+      <LineId Id="189" Count="0" />
+      <LineId Id="133" Count="0" />
+      <LineId Id="173" Count="0" />
+      <LineId Id="165" Count="0" />
+      <LineId Id="186" Count="0" />
+      <LineId Id="169" Count="0" />
+      <LineId Id="194" Count="0" />
+      <LineId Id="170" Count="0" />
+      <LineId Id="190" Count="0" />
+      <LineId Id="207" Count="1" />
+      <LineId Id="192" Count="0" />
+      <LineId Id="1126" Count="0" />
+      <LineId Id="198" Count="0" />
+      <LineId Id="205" Count="0" />
+      <LineId Id="193" Count="0" />
+      <LineId Id="191" Count="0" />
+      <LineId Id="167" Count="0" />
+      <LineId Id="164" Count="0" />
+      <LineId Id="1193" Count="0" />
+      <LineId Id="1198" Count="0" />
+      <LineId Id="1194" Count="0" />
+      <LineId Id="1820" Count="0" />
+      <LineId Id="1195" Count="2" />
+      <LineId Id="1821" Count="0" />
+      <LineId Id="1199" Count="0" />
+      <LineId Id="134" Count="0" />
+      <LineId Id="1900" Count="0" />
+      <LineId Id="135" Count="0" />
+      <LineId Id="195" Count="0" />
+      <LineId Id="197" Count="0" />
+      <LineId Id="812" Count="0" />
+      <LineId Id="201" Count="0" />
+      <LineId Id="149" Count="1" />
+      <LineId Id="1130" Count="0" />
+      <LineId Id="153" Count="0" />
+      <LineId Id="218" Count="1" />
+      <LineId Id="217" Count="0" />
+      <LineId Id="202" Count="0" />
+      <LineId Id="220" Count="0" />
+      <LineId Id="212" Count="1" />
+      <LineId Id="408" Count="0" />
+      <LineId Id="406" Count="1" />
+      <LineId Id="215" Count="1" />
+      <LineId Id="155" Count="0" />
+      <LineId Id="136" Count="0" />
+      <LineId Id="400" Count="0" />
+      <LineId Id="411" Count="0" />
+      <LineId Id="1563" Count="1" />
+      <LineId Id="1570" Count="0" />
+      <LineId Id="1574" Count="0" />
+      <LineId Id="1571" Count="0" />
+      <LineId Id="1569" Count="0" />
+      <LineId Id="1566" Count="1" />
+      <LineId Id="1565" Count="0" />
+      <LineId Id="402" Count="0" />
+      <LineId Id="1554" Count="0" />
+      <LineId Id="403" Count="0" />
+      <LineId Id="1549" Count="1" />
+      <LineId Id="1552" Count="1" />
+      <LineId Id="1551" Count="0" />
+      <LineId Id="1548" Count="0" />
+      <LineId Id="412" Count="0" />
+      <LineId Id="158" Count="0" />
+      <LineId Id="1207" Count="0" />
+      <LineId Id="1907" Count="0" />
+      <LineId Id="1366" Count="0" />
+      <LineId Id="1270" Count="0" />
+      <LineId Id="1209" Count="0" />
+      <LineId Id="1578" Count="3" />
+      <LineId Id="1577" Count="0" />
+      <LineId Id="1375" Count="1" />
+      <LineId Id="226" Count="0" />
+      <LineId Id="125" Count="0" />
+      <LineId Id="477" Count="1" />
+      <LineId Id="631" Count="0" />
+      <LineId Id="479" Count="12" />
+      <LineId Id="1344" Count="0" />
+      <LineId Id="1337" Count="6" />
+      <LineId Id="1898" Count="0" />
+      <LineId Id="1328" Count="1" />
+      <LineId Id="1378" Count="0" />
+      <LineId Id="1380" Count="0" />
+      <LineId Id="1533" Count="0" />
+      <LineId Id="1381" Count="1" />
+      <LineId Id="1670" Count="0" />
+      <LineId Id="1901" Count="1" />
+      <LineId Id="1386" Count="0" />
+      <LineId Id="1535" Count="0" />
+      <LineId Id="1537" Count="0" />
+      <LineId Id="1534" Count="0" />
+      <LineId Id="1538" Count="1" />
+      <LineId Id="1388" Count="0" />
+      <LineId Id="492" Count="0" />
+      <LineId Id="722" Count="0" />
+      <LineId Id="1745" Count="1" />
+      <LineId Id="632" Count="0" />
+      <LineId Id="644" Count="1" />
+      <LineId Id="647" Count="0" />
+      <LineId Id="716" Count="0" />
+      <LineId Id="649" Count="0" />
+      <LineId Id="672" Count="3" />
+      <LineId Id="683" Count="0" />
+      <LineId Id="1127" Count="0" />
+      <LineId Id="677" Count="0" />
+      <LineId Id="681" Count="0" />
+      <LineId Id="650" Count="0" />
+      <LineId Id="646" Count="0" />
+      <LineId Id="685" Count="0" />
+      <LineId Id="496" Count="2" />
+      <LineId Id="658" Count="0" />
+      <LineId Id="506" Count="1" />
+      <LineId Id="509" Count="0" />
+      <LineId Id="514" Count="0" />
+      <LineId Id="735" Count="3" />
+      <LineId Id="515" Count="0" />
+      <LineId Id="743" Count="2" />
+      <LineId Id="747" Count="0" />
+      <LineId Id="746" Count="0" />
+      <LineId Id="715" Count="0" />
+      <LineId Id="1747" Count="0" />
+      <LineId Id="686" Count="0" />
+      <LineId Id="1749" Count="1" />
+      <LineId Id="717" Count="0" />
+      <LineId Id="687" Count="0" />
+      <LineId Id="693" Count="1" />
+      <LineId Id="719" Count="0" />
+      <LineId Id="695" Count="0" />
+      <LineId Id="718" Count="0" />
+      <LineId Id="703" Count="0" />
+      <LineId Id="731" Count="3" />
+      <LineId Id="704" Count="6" />
+      <LineId Id="1128" Count="0" />
+      <LineId Id="711" Count="0" />
+      <LineId Id="713" Count="0" />
+      <LineId Id="727" Count="1" />
+      <LineId Id="730" Count="0" />
+      <LineId Id="729" Count="0" />
+      <LineId Id="714" Count="0" />
+      <LineId Id="751" Count="0" />
+      <LineId Id="748" Count="0" />
+      <LineId Id="752" Count="0" />
+      <LineId Id="749" Count="1" />
+      <LineId Id="688" Count="0" />
+      <LineId Id="516" Count="0" />
+      <LineId Id="1744" Count="0" />
+      <LineId Id="518" Count="0" />
+      <LineId Id="1899" Count="0" />
+      <LineId Id="753" Count="1" />
+      <LineId Id="805" Count="1" />
+      <LineId Id="810" Count="0" />
+      <LineId Id="756" Count="1" />
+      <LineId Id="808" Count="1" />
+      <LineId Id="755" Count="0" />
+      <LineId Id="1743" Count="0" />
+      <LineId Id="519" Count="0" />
+      <LineId Id="804" Count="0" />
+      <LineId Id="520" Count="3" />
+      <LineId Id="739" Count="0" />
+      <LineId Id="1129" Count="0" />
+      <LineId Id="524" Count="8" />
+      <LineId Id="758" Count="4" />
+      <LineId Id="533" Count="7" />
+      <LineId Id="1594" Count="5" />
+      <LineId Id="541" Count="0" />
+      <LineId Id="763" Count="1" />
+      <LineId Id="775" Count="1" />
+      <LineId Id="765" Count="1" />
+      <LineId Id="778" Count="1" />
+      <LineId Id="767" Count="0" />
+      <LineId Id="542" Count="1" />
+      <LineId Id="1601" Count="1" />
+      <LineId Id="544" Count="0" />
+      <LineId Id="780" Count="0" />
+      <LineId Id="789" Count="0" />
+      <LineId Id="781" Count="0" />
+      <LineId Id="783" Count="1" />
+      <LineId Id="790" Count="0" />
+      <LineId Id="785" Count="0" />
+      <LineId Id="787" Count="1" />
+      <LineId Id="545" Count="3" />
+      <LineId Id="1582" Count="0" />
+      <LineId Id="1909" Count="0" />
+      <LineId Id="1583" Count="1" />
+      <LineId Id="791" Count="2" />
+      <LineId Id="800" Count="0" />
+      <LineId Id="795" Count="2" />
+      <LineId Id="801" Count="0" />
+      <LineId Id="1374" Count="0" />
+      <LineId Id="1453" Count="0" />
+      <LineId Id="799" Count="0" />
+      <LineId Id="552" Count="3" />
+      <LineId Id="210" Count="0" />
+      <LineId Id="284" Count="2" />
+      <LineId Id="47" Count="0" />
+      <LineId Id="454" Count="0" />
+      <LineId Id="1561" Count="1" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

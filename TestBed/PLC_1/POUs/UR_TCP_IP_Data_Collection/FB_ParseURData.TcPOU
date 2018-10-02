@@ -1,0 +1,102 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="FB_ParseURData" Id="{cb29e40e-52e7-4b77-8822-bd9ae3aae1db}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ParseURData
+VAR_INPUT
+	Robot: STRING;
+	data: ARRAY [1..1500] OF BYTE;
+END_VAR
+VAR_OUTPUT
+
+END_VAR
+VAR
+	stMessageData: ST_PackageInfo;
+	nMessageLength: UDINT;
+	nPackageLength: UDINT;
+	nMessageType: USINT;
+	nPackageType: USINT;
+	
+	nNextStart: UDINT;
+	nRecordIndex: INT;
+	arrPackageData: ARRAY [1..500] OF BYTE;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(* Find Total Message Length and Type *)
+MEMMOVE(ADR(stMessageData),ADR(data[1]),5);
+nMessageLength := BE32_TO_HOST(stMessageData.PackageLength);			// Length of message from Robot
+nMessageType := stMessageData.MessageType;								// Type of message from robot 
+nNextStart := 6;														// Next byte index in data that is relevant
+
+(* Handle Message Type 16 (Robot State) *)
+IF nMessageType=16 THEN
+	FOR nRecordIndex := 1 TO 11 DO										// For each of the possible sub-package types (11 possible)
+		(* Extract next sub-package length and type *)
+		MEMMOVE(ADR(stMessageData),ADR(data[nNextStart]),5);			// Move package length and type to interpretable structure 
+		nPackageLength := BE32_TO_HOST(stMessageData.PackageLength);	// Package Length (with conversion)
+		nPackageType := stMessageData.MessageType;						// Package type
+		MEMMOVE(ADR(arrPackageData),ADR(data[nNextStart]),nPackageLength);	// Move entire package to a buffer array
+		(* Extract Data to structure according to data package type *)
+		IF nPackageType=0 THEN											// If package type zero
+			IF Robot='UR5' THEN
+				// Call function to mode data from the buffer to the predefined structure
+				Global.stUR5.RobotModeData := F_RecRobotModeData(arrPackageData);
+			ELSIF Robot='UR3' THEN
+				Global.stUR3.RobotModeData := F_RecRobotModeData(arrPackageData);
+			END_IF
+			
+		ELSIF nPackageType=1 THEN
+			IF Robot='UR5' THEN
+				Global.stUR5.JointData := F_RecJointData(arrPackageData);
+			ELSIF Robot='UR3' THEN
+				Global.stUR3.JointData := F_RecJointData(arrPackageData);
+			END_IF
+		ELSIF nPackageType=4 THEN
+			IF Robot='UR5' THEN
+				Global.stUR5.CartesianInfo := F_RecCartesianInfo(arrPackageData);
+			ELSIF Robot='UR3' THEN
+				Global.stUR3.CartesianInfo := F_RecCartesianInfo(arrPackageData);
+			END_IF			
+		ELSIF nPackageType=6 THEN
+			IF Robot='UR5' THEN
+				Global.stUR5.ConfigurationData := F_RecConfigurationData(arrPackageData);
+			ELSIF Robot='UR3' THEN
+				Global.stUR3.ConfigurationData := F_RecConfigurationData(arrPackageData);
+			END_IF
+		ELSIF nPackageType=7 THEN
+			IF Robot='UR5' THEN
+				Global.stUR5.ForceModeData := F_RecForceModeData(arrPackageData);
+			ELSIF Robot='UR3' THEN
+				Global.stUR3.ForceModeData := F_RecForceModeData(arrPackageData);
+			END_IF
+		END_IF
+		nNextStart := nNextStart + nPackageLength; // Increment next index of interest in data
+		IF nNextStart>nMessageLength THEN // Exit for loop if all data has been parsed
+			EXIT;
+		END_IF
+	END_FOR
+END_IF]]></ST>
+    </Implementation>
+    <LineIds Name="FB_ParseURData">
+      <LineId Id="10" Count="3" />
+      <LineId Id="103" Count="1" />
+      <LineId Id="14" Count="8" />
+      <LineId Id="212" Count="0" />
+      <LineId Id="164" Count="0" />
+      <LineId Id="167" Count="2" />
+      <LineId Id="165" Count="0" />
+      <LineId Id="218" Count="0" />
+      <LineId Id="35" Count="0" />
+      <LineId Id="170" Count="0" />
+      <LineId Id="172" Count="3" />
+      <LineId Id="152" Count="1" />
+      <LineId Id="177" Count="3" />
+      <LineId Id="55" Count="0" />
+      <LineId Id="181" Count="4" />
+      <LineId Id="105" Count="0" />
+      <LineId Id="186" Count="4" />
+      <LineId Id="75" Count="6" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

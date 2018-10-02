@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_RobotModeData" Id="{cdb3d529-3671-4fd9-b442-c14f428b4af6}">
+    <Declaration><![CDATA[TYPE ST_RobotModeData :
+STRUCT
+	(* Robot Mode Data (Value 0) Length: 46 Bytes *)
+	PackageLength: UDINT;
+	PackageType: USINT;
+	Timestamp: LWORD;
+	PhysicalRobotConnected: BYTE; 
+	RealRobotEnabled: BYTE; 
+	RobotPowerOn: BYTE; 
+	EmergencyStopped: BYTE;
+	ProtectiveStopped: BYTE;
+	ProgramRunning: BYTE;
+	ProgramPaused: BYTE;
+	RobotMode: USINT;
+	ControlMode: USINT;
+	TargetSpeedFraction: LWORD;
+	SpeedScaling: LWORD;
+	TargetSpeedFractionLimit: LWORD;
+	
+	arrVarLength: ARRAY [1..15] OF USINT := [4,1,8,9(1),3(8)];
+	
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

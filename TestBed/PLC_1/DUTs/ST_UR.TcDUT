@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_UR" Id="{9453f6d7-de95-4c62-b12e-f50dae8a2e48}">
+    <Declaration><![CDATA[TYPE ST_UR :
+STRUCT
+	// Robot Setup Variables (Constants)
+	IP: STRING(15);
+	mbPort: UINT := 502;
+	unitID: BYTE := 255;
+
+	// MODBUS Robot Data 
+	mode : WORD;
+	
+	// TCP/IP Connection Data
+	RobotModeData : ST_RobotModeData;
+	JointData : ST_JointData;
+	ConfigurationData : ST_ConfigurationData;
+	CartesianInfo : ST_CartesianInfo;
+	ForceModeData : ST_ForceModeData;
+	
+	// Induced Joint Error 
+	InducedJErrorType : WORD; // 0 none, 1 slip, 2 backlash
+	InducedJointError : ARRAY [1..6] OF WORD;
+	
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

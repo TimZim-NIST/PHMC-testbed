@@ -1,0 +1,225 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="FB_CSV_FTDataWriter" Id="{3733ed52-f391-4bba-ab7a-c3ca44b24c84}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_CSV_FTDataWriter
+VAR_INPUT
+	bWriteLine : BOOL;
+	sFileName:	STRING;
+	stFTData : ST_OptoforceUDPData;
+	bEnable : BOOL;
+END_VAR
+VAR_OUTPUT
+	bBusy:	BOOL;
+	bFileOpen : BOOL;
+	bError:	BOOL;
+	sError:	STRING;
+END_VAR
+VAR
+	fbFileOpen:	FB_FileOpen;
+	fbFilePuts:	FB_FilePuts;
+	fbFileClose:	FB_FileClose;
+	
+	rtWrite:	R_TRIG;
+	
+	nState:	INT;
+	sTempPathName:	STRING;
+	sDataString1:	STRING(255);
+	sDataString2:	STRING(255);
+	
+	nLastTimestamp : UDINT;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[//rtWrite(	CLK := bWriteLine);
+
+CASE nState OF
+	0:	(*IDLE*)
+		bBusy := FALSE;
+		// choose state		
+		IF bFileOpen AND NOT bEnable THEN
+			// close file
+			nState := 30;
+		END_IF
+		
+		IF nLastTimestamp <> stFTData.FT_sequence THEN
+			bWriteLine := FALSE;
+			bBusy := TRUE;
+			bError := FALSE;
+			sError := '';
+			sTempPathName := CONCAT(CONCAT('D:\PLCTempData\',sFileName),'.csv');
+			// Build Datastrings
+			// uint = 20 characters, word = 6 characters, bool = 5 characters, lword = 11, lreal = 16/15 
+			// 12 ulints = 240 bytes max string length of 255
+			sDataString1 := '';
+			//time
+			sDataString1 := INSERT(sDataString1,CONCAT(LWORD_TO_STRING(Global.nCurrentTime),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(UDINT_TO_STRING(stFTData.FT_sequence),','),LEN(sDataString1));
+			//position
+			sDataString1 := INSERT(sDataString1,CONCAT(DINT_TO_STRING(stFTData.HS_sequence),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(DINT_TO_STRING(stFTData.Status),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(DINT_TO_STRING(stFTData.Fx),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(DINT_TO_STRING(stFTData.Fy),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(DINT_TO_STRING(stFTData.Fz),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(DINT_TO_STRING(stFTData.Tx),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(DINT_TO_STRING(stFTData.Ty),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(DINT_TO_STRING(stFTData.Tz),','),LEN(sDataString1));
+			sDataString1 := CONCAT(sDataString1,'$N');
+			
+			(*
+			// Second half of part data
+			sDataString2 := '';
+			//velocity
+			sDataString2 := INSERT(sDataString2,CONCAT(LREAL_TO_STRING(stRobotData.JointData.j1_qdactual),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(LREAL_TO_STRING(stRobotData.JointData.j2_qdactual),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(LREAL_TO_STRING(stRobotData.JointData.j3_qdactual),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(LREAL_TO_STRING(stRobotData.JointData.j4_qdactual),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(LREAL_TO_STRING(stRobotData.JointData.j5_qdactual),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(LREAL_TO_STRING(stRobotData.JointData.j6_qdactual),','),LEN(sDataString2));
+			// Tool XYZ
+			sDataString2 := INSERT(sDataString2,CONCAT(LREAL_TO_STRING(stRobotData.CartesianInfo.ToolX),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(LREAL_TO_STRING(stRobotData.CartesianInfo.ToolY),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(LREAL_TO_STRING(stRobotData.CartesianInfo.ToolZ),','),LEN(sDataString2));
+			// New line
+			sDataString2 := CONCAT(sDataString2,'$N');
+			*)
+			
+			// Keep track of new messages
+			nLastTimestamp := stFTData.FT_sequence;
+			
+			// go to next state
+			IF bFileOpen THEN
+				// start writing strings
+				nState := 20;
+			ELSE
+				// open file
+				nState := 10;
+			END_IF
+		END_IF		
+	
+	10:	(*Open File*)	
+		fbFileOpen(	sPathName := sTempPathName,
+					nMode := FOPEN_MODEAPPEND,
+					bExecute := TRUE,
+					tTimeOut := T#1S);
+		IF NOT fbFileOpen.bBusy THEN
+			fbFileOpen(	bExecute := FALSE);
+			IF fbFileOpen.bError THEN
+				bError := TRUE;
+				sError := 'Could Not Open File';
+				nState := 0;
+			ELSE
+				bFileOpen := TRUE;
+				nState := nState + 10;
+			END_IF
+		END_IF
+		
+	20:	(*Write Line To File*)
+		fbFilePuts(	hFile := fbFileOpen.hFile,
+					sLine := sDataString1,
+					bExecute := TRUE,
+					tTimeout := T#1S);
+		IF NOT fbFilePuts.bBusy THEN
+			fbFilePuts(	bExecute := FALSE);
+			IF fbFilePuts.bError THEN
+				bError := TRUE;
+				sError := 'Could not write to file';
+				nState := nState + 10;
+			ELSE
+				nState := nState + 10; // make +1 for second string inclusion
+			END_IF
+		END_IF
+	21:	(*Write Line To File*)
+		fbFilePuts(	hFile := fbFileOpen.hFile,
+					sLine := sDataString2,
+					bExecute := TRUE,
+					tTimeout := T#1S);
+		IF NOT fbFilePuts.bBusy THEN
+			fbFilePuts(	bExecute := FALSE);
+			IF fbFilePuts.bError THEN
+				bError := TRUE;
+				sError := 'Could not write to file';
+				nState := 30;
+			ELSE
+				IF bEnable THEN
+					nState := 0;
+				ELSE
+					nState := 30;
+				END_IF
+			END_IF
+		END_IF
+		
+	30:	(*Close File*)
+		fbFileClose(	hFile := fbFileOpen.hFile,
+						bExecute := TRUE,
+						tTimeout := T#1S);
+		IF NOT fbFileClose.bBusy THEN
+			fbFileClose(	bExecute := FALSE);
+			IF fbFileClose.bError THEN
+				bError := TRUE;
+				sError := 'Could not close file';
+				nState := 0;
+			ELSE
+				bFileOpen := FALSE;
+				nState := 0;
+			END_IF
+		END_IF
+END_CASE]]></ST>
+    </Implementation>
+    <LineIds Name="FB_CSV_FTDataWriter">
+      <LineId Id="10" Count="3" />
+      <LineId Id="362" Count="0" />
+      <LineId Id="365" Count="1" />
+      <LineId Id="382" Count="0" />
+      <LineId Id="369" Count="1" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="255" Count="0" />
+      <LineId Id="243" Count="0" />
+      <LineId Id="253" Count="1" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="97" Count="0" />
+      <LineId Id="192" Count="0" />
+      <LineId Id="141" Count="0" />
+      <LineId Id="101" Count="0" />
+      <LineId Id="268" Count="0" />
+      <LineId Id="354" Count="0" />
+      <LineId Id="185" Count="0" />
+      <LineId Id="269" Count="0" />
+      <LineId Id="186" Count="0" />
+      <LineId Id="257" Count="4" />
+      <LineId Id="421" Count="1" />
+      <LineId Id="270" Count="0" />
+      <LineId Id="425" Count="0" />
+      <LineId Id="423" Count="0" />
+      <LineId Id="140" Count="0" />
+      <LineId Id="160" Count="0" />
+      <LineId Id="385" Count="7" />
+      <LineId Id="216" Count="1" />
+      <LineId Id="271" Count="0" />
+      <LineId Id="393" Count="0" />
+      <LineId Id="17" Count="0" />
+      <LineId Id="115" Count="0" />
+      <LineId Id="424" Count="0" />
+      <LineId Id="377" Count="0" />
+      <LineId Id="379" Count="0" />
+      <LineId Id="378" Count="0" />
+      <LineId Id="371" Count="1" />
+      <LineId Id="383" Count="0" />
+      <LineId Id="374" Count="1" />
+      <LineId Id="384" Count="0" />
+      <LineId Id="373" Count="0" />
+      <LineId Id="376" Count="0" />
+      <LineId Id="22" Count="13" />
+      <LineId Id="296" Count="0" />
+      <LineId Id="36" Count="18" />
+      <LineId Id="142" Count="11" />
+      <LineId Id="358" Count="0" />
+      <LineId Id="154" Count="0" />
+      <LineId Id="359" Count="2" />
+      <LineId Id="155" Count="1" />
+      <LineId Id="55" Count="11" />
+      <LineId Id="297" Count="0" />
+      <LineId Id="67" Count="3" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

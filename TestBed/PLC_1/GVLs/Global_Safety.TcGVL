@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <GVL Name="Global_Safety" Id="{21abb2b6-c64a-456a-893a-9cd5ba985385}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+	// Safety Related Variables (Excluding Data from Robot)
+	
+	// Safety Inputs
+	ResetPB AT %I*: BOOL;
+	NotInRedSpeed AT %I*: BOOL;
+	NotInSafeStop AT %I*: BOOL;
+	NotInEStop AT %I*: BOOL;
+	ProgramModeActive AT %I*: BOOL;
+	
+	SafetyPLCState AT %I*: USINT;
+	
+	// Safety Outputs
+	ErrorAck AT %Q*: BOOL;
+	
+	// Stack Lights
+	UR3RedIND AT %Q*: BOOL;
+	UR3AmberIND AT %Q*: BOOL;
+	UR3GreenIND AT %Q*: BOOL;
+	UR3BlueIND AT %Q*: BOOL;
+	UR5RedIND AT %Q*: BOOL;
+	UR5AmberIND AT %Q*: BOOL;
+	UR5GreenIND AT %Q*: BOOL;
+	UR5BlueIND AT %Q*: BOOL;
+	
+	// Control Pendant Indicators
+	CPEStopIND AT %Q*: BOOL;
+	CPFaultIND AT %Q*: BOOL;
+	CPEProgramModeIND AT %Q*: BOOL;
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>

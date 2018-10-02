@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_Fixture" Id="{502d0da8-197e-4b21-a0a6-f9abf2ea8def}">
+    <Declaration><![CDATA[TYPE ST_Fixture :
+STRUCT
+	// Fixture Constants
+	nWorkframe : WORD;
+	
+	// Fixture State
+	bReserved : BOOL;
+	
+	// Part
+	stPart : ST_Part := (bExists := FALSE, bComplete := FALSE);
+	
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

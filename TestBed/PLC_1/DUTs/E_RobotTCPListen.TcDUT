@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="E_RobotTCPListen" Id="{551317f7-4e08-402d-b29c-244a13308ac0}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+TYPE E_RobotTCPListen :
+(
+	Idle,
+	Connect_Start,
+	Connect_Wait,
+	Receive_Start,
+	Receive_Wait,
+	Close_Start,
+	Close_Wait,
+	HandleError
+);
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

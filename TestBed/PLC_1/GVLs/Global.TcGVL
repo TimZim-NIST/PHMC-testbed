@@ -1,0 +1,108 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <GVL Name="Global" Id="{099a1568-fade-4f36-938a-eb885394214c}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+	(* Robot Data *)
+	
+	// Robot Structures
+	stUR5 : ST_UR := (IP := '192.168.1.5'); // UR5
+	stUR3 : ST_UR := (IP := '192.168.1.3'); // UR3
+	bUR5NewTCPData : BOOL;
+	bUR3NewTCPData : BOOL;
+	
+	bUR3InTask : BOOL;
+	bUR5InTask : BOOL;
+	
+	
+	// Universal Robot MODBUS Addresses (16 bit registers)
+	ModeAddr: WORD := 258; // Robot Mode MODBUS Address
+	
+	
+	(* Workcell Variables *)
+	
+	// Process Control
+	bActivatePartDataRecording : BOOL;
+	bActivateTaskAssignment : BOOL;
+	bActivateTCPIPDataCollection : BOOL;
+	bActivateTCPIPDataRecording : BOOL;
+	bActivateFTDataCollection : BOOL;
+	bActivateFTDataRecording : BOOL;
+	
+	// Drawing Task control variable (Togled on setting visualization)
+	// Box and Circle is Task 0 (1 in URScript) and NIST Draw is Task 1 (2 in URScript)
+	nActiveUR3Task : WORD; // 0 Box and Circle, 1 NIST Logo, 2 Reserved
+	
+	// ADS Control Variables
+	bCycleStart : BOOL;
+	bCycleStop : BOOL;
+	bResetPartCount : BOOL;
+	
+	// Fixtures
+	bPosSensorReserved: BOOL;
+	nNumWorkFixtures : INT := 2;
+	arrWorkFixtures : ARRAY [0..2] OF ST_Fixture := [
+									(nWorkframe := 0),
+									(nWorkframe := 1), 
+									(nWorkframe := 2)];
+	nNumInputFixtures : INT := 1; // 1 fixture for setup 1 can be made multiple for trays/batch
+	arrInputFixtures : ARRAY [0..4] OF ST_Fixture:= [
+									(nWorkframe := 0),
+									(nWorkframe := 1), 
+									(nWorkframe := 2),
+									(nWorkframe := 3), 
+									(nWorkframe := 4)];
+	nNumOutputFixtures : INT := 1; // 1 fixture for setup 1 can be made multiple for trays/batch
+	arrOutputFixtures : ARRAY [0..4] OF ST_Fixture:= [
+									(nWorkframe := 0),
+									(nWorkframe := 1), 
+									(nWorkframe := 2),
+									(nWorkframe := 3), 
+									(nWorkframe := 4)];
+									
+	
+	// Parts
+	stNullPart : ST_Part;
+	stPartInTransit : ST_Part;
+	
+	// Time
+	nCurrentTime : ULINT; // Current windows time
+	nStartTime : ULINT;
+	
+	// I/O on EtherCAT
+	pbStart AT %I*: BOOL; 		// Start Button on Control Pendant (NO)
+	pbStop AT %I*: BOOL;		// Stop Button on Control Pendant (NC)
+	
+	indStartPB AT %Q*: BOOL;
+	indStopPB AT %Q*: BOOL;
+	
+	
+	(* HMI Variables for Display *)
+	// Unused
+	
+	(* History *)
+	CompletedParts : ARRAY [1..10] OF ST_Part;
+	nPartsStarted : WORD;
+	nPartsCompleted : ULINT;
+	nTotalPartTime : ULINT;
+	nAveragePartTime : LREAL;
+	
+	
+	(* Health Data *)
+	bPosSensorState AT %I* : BOOL; // Position Sensor
+	bEnablePosCheck : BOOL;
+	bForcePosCheck : BOOL;
+	nPartsSincePosCheck : UINT;
+	nPosCheckThreshold : UINT := 100;
+	
+	UR3PosCheck : ARRAY [1..2] OF BOOL; // ST_16Bool for UR integrated sensor
+	UR5PosCheck : ARRAY [1..5] OF BOOL; // ST_16Bool for UR integrated sensor
+	
+	(* Other *)
+	stFTData : ST_OptoforceUDPData;
+	
+	
+	
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>

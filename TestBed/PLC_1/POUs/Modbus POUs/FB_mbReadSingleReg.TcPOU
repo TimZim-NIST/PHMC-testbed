@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="FB_mbReadSingleReg" Id="{230d1009-9a7b-403f-9bb4-609c9552ea77}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_mbReadSingleReg
+VAR_INPUT
+	Robot : STRING;
+	Register : UINT;
+END_VAR
+VAR_OUTPUT
+	Value : WORD;
+END_VAR
+VAR
+	mbRead : FB_mbReadRegs;
+	state : int;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(* 
+FB_mbReadSingleReg - Function Block that can be called to read a single MODBUS register from a pre-defined UR Robot
+	INPUTS:
+		- Robot: 'UR5' or 'UR3'
+		- Register: register number to read
+	OUTPUTS
+		- Value: The returned value
+*)
+
+// Set function block vairables
+mbRead.nQuantity := 1;
+mbRead.cbLength := 2;
+
+IF Robot='UR5' THEN
+	mbRead.sIPAddr := Global.stUR5.IP;
+	mbRead.nTCPPort := Global.stUR5.mbPort;
+	mbRead.nUnitID := Global.stUR5.unitID;
+ELSIF Robot='UR3' THEN
+	mbRead.sIPAddr := Global.stUR3.IP;
+	mbRead.nTCPPort := Global.stUR3.mbPort;
+	mbRead.nUnitID := Global.stUR3.unitID;
+END_IF
+
+mbRead.pDestAddr := ADR(Value);
+mbRead.nMBAddr := Register;
+
+// Set/Determine State of Function block
+CASE state OF
+	0:
+		mbRead.bExecute := TRUE;
+		state := 10;
+	10:
+		IF NOT mbRead.bBusy THEN
+			mbRead.bExecute :=FALSE;
+			state := 0;
+		END_IF
+END_CASE
+
+// Run function block
+mbRead();]]></ST>
+    </Implementation>
+    <LineIds Name="FB_mbReadSingleReg">
+      <LineId Id="105" Count="0" />
+      <LineId Id="98" Count="5" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="86" Count="1" />
+      <LineId Id="91" Count="1" />
+      <LineId Id="90" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="40" Count="1" />
+      <LineId Id="44" Count="1" />
+      <LineId Id="106" Count="1" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="93" Count="2" />
+      <LineId Id="33" Count="0" />
+      <LineId Id="97" Count="0" />
+      <LineId Id="121" Count="1" />
+      <LineId Id="124" Count="0" />
+      <LineId Id="127" Count="0" />
+      <LineId Id="125" Count="1" />
+      <LineId Id="128" Count="0" />
+      <LineId Id="130" Count="0" />
+      <LineId Id="129" Count="0" />
+      <LineId Id="123" Count="0" />
+      <LineId Id="48" Count="0" />
+      <LineId Id="96" Count="0" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

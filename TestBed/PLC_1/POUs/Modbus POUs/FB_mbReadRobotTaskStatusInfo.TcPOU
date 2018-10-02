@@ -1,0 +1,113 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="FB_mbReadRobotTaskStatusInfo" Id="{fefaa6e2-e81f-4ae4-b48c-1980aeba3e13}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_mbReadRobotTaskStatusInfo
+VAR_INPUT
+	Robot : STRING;
+END_VAR
+VAR_OUTPUT
+	stTaskStatusInfo : ST_RobotTaskStatusInfo;
+END_VAR
+VAR
+	Value : ARRAY [1..12] OF WORD;
+	mbRead : FB_mbReadRegs;
+	state : int;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(* 
+FB_mbReadRobotStatusInfo - Function Block that can be called to read a Robot status registers: 128-139
+	INPUTS:
+		- Robot : Sting, 'UR5' or 'UR3'
+	OUTPUTS
+		- RobotTaskStatus : WORD;
+		- ZoneOccupied : WORD;
+		- IsInTask : BOOL;
+		- IsPerformingTaskAction : BOOL;
+*)
+
+// Set function block vairables
+mbRead.nQuantity := 12;
+mbRead.cbLength := 24;
+
+IF Robot='UR5' THEN
+	mbRead.sIPAddr := Global.stUR5.IP;
+	mbRead.nTCPPort := Global.stUR5.mbPort;
+	mbRead.nUnitID := Global.stUR5.unitID;
+ELSIF Robot='UR3' THEN
+	mbRead.sIPAddr := Global.stUR3.IP;
+	mbRead.nTCPPort := Global.stUR3.mbPort;
+	mbRead.nUnitID := Global.stUR3.unitID;
+END_IF
+
+mbRead.pDestAddr := ADR(Value);
+mbRead.nMBAddr := 128;
+
+// Set/Determine State of Function block
+CASE state OF
+	0:
+		mbRead.bExecute := TRUE;
+		state := 10;
+	10:
+		IF NOT mbRead.bBusy THEN
+			mbRead.bExecute :=FALSE;
+			state := 20;
+		END_IF
+	20:
+		stTaskStatusInfo.nRobotTaskStatus := Value[1];
+		stTaskStatusInfo.nZoneOccupied := Value[2];
+		stTaskStatusInfo.bInTask := INT_TO_BOOL(Value[3]);
+		stTaskStatusInfo.bPerformingTaskAction := INT_TO_BOOL(Value[4]);
+		
+		IF stTaskStatusInfo.nRobotTaskStatus = 1 THEN
+			stTaskStatusInfo.sRobotStatus := 'Waiting for Task Assignment';
+		ELSIF stTaskStatusInfo.nRobotTaskStatus = 2 THEN
+			stTaskStatusInfo.sRobotStatus := 'Executing Assigned Task';
+		END_IF
+
+		state := 0;
+END_CASE
+
+// Run function block
+mbRead();]]></ST>
+    </Implementation>
+    <LineIds Name="FB_mbReadRobotTaskStatusInfo">
+      <LineId Id="105" Count="0" />
+      <LineId Id="98" Count="1" />
+      <LineId Id="101" Count="1" />
+      <LineId Id="154" Count="2" />
+      <LineId Id="103" Count="0" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="86" Count="1" />
+      <LineId Id="91" Count="1" />
+      <LineId Id="90" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="40" Count="1" />
+      <LineId Id="44" Count="1" />
+      <LineId Id="106" Count="1" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="93" Count="2" />
+      <LineId Id="33" Count="0" />
+      <LineId Id="97" Count="0" />
+      <LineId Id="121" Count="1" />
+      <LineId Id="124" Count="0" />
+      <LineId Id="127" Count="0" />
+      <LineId Id="125" Count="1" />
+      <LineId Id="128" Count="0" />
+      <LineId Id="130" Count="0" />
+      <LineId Id="129" Count="0" />
+      <LineId Id="144" Count="1" />
+      <LineId Id="150" Count="2" />
+      <LineId Id="169" Count="2" />
+      <LineId Id="174" Count="1" />
+      <LineId Id="172" Count="0" />
+      <LineId Id="146" Count="0" />
+      <LineId Id="153" Count="0" />
+      <LineId Id="123" Count="0" />
+      <LineId Id="48" Count="0" />
+      <LineId Id="96" Count="0" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

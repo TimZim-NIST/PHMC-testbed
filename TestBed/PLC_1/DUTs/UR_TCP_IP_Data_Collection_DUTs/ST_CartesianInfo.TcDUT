@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_CartesianInfo" Id="{743e0c99-37af-4b21-8acf-92082ffa827f}">
+    <Declaration><![CDATA[TYPE ST_CartesianInfo :
+STRUCT
+	// Cartesian Info (Value 4)
+	// CartesianInfo: ARRAY [1..101] OF BYTE;
+	PackageLength: UDINT;
+	PackageType: USINT;
+	ToolX: LREAL;
+	ToolY: LREAL;
+	ToolZ: LREAL;
+	ToolRx: LREAL;
+	ToolRy: LREAL;
+	ToolRz: LREAL;
+	TCPOffsetX: LREAL;
+	TCPOffsetY: LREAL;
+	TCPOffsetZ: LREAL;
+	TCPOffsetRx: LREAL;
+	TCPOffsetRy: LREAL;
+	TCPOffsetRz: LREAL;
+	
+	arrVarLength: ARRAY [1..14] OF USINT := [4,1,12(8)];
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

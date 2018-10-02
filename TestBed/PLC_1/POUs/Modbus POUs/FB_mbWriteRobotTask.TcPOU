@@ -1,0 +1,152 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="FB_mbWriteRobotTask" Id="{21ada1c1-e572-4456-aa62-58897bae4a64}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_mbWriteRobotTask
+VAR_INPUT
+	bExecute : BOOL;
+	Robot : STRING;
+	// Keep task and workframe together for memory allocation
+	Task : WORD;
+	Workframe1 : WORD;
+	Workframe2 : WORD;
+	PartNumber : WORD;
+	ResumeTask : WORD;
+END_VAR
+VAR_OUTPUT
+	bBusy : BOOL;
+END_VAR
+VAR
+	message : ARRAY [1..13] OF WORD;
+	mbWrite : FB_mbWriteRegs;
+	state : INT;
+	NewTask : WORD;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(* 
+FB_mbWriteRobotTask - Function Block that can be called to write robot
+Registers 140-149
+	See IO_Documentation.xlsx file for register mapping summary
+		
+*)
+IF bExecute THEN
+	// Set/Determine State of Function block
+	CASE state OF
+		0:
+			(* Build Message to send *)
+			// Newtask always equals 1 when sending a new task
+			NewTask := 1;
+			ResumeTask := 0;
+			// put variable being transfered into organized memory space
+			message[1] := NewTask;
+			message[2] := Task;
+			message[3] := Workframe1;
+			message[4] := Workframe2;
+			message[5] := PartNumber;
+			message[6] := ResumeTask;
+			
+			(* Set function block vairables *)
+			// package size information
+			mbWrite.nQuantity := 13;
+			mbWrite.cbLength := 26;
+			
+			// Robot specific information
+			IF Robot='UR5' THEN
+				mbWrite.sIPAddr := Global.stUR5.IP;
+				mbWrite.nTCPPort := Global.stUR5.mbPort;
+				mbWrite.nUnitID := Global.stUR5.unitID;
+				
+				message[7] := Global.stUR5.InducedJErrorType;
+				message[8] := Global.stUR5.InducedJointError[1];
+				message[9] := Global.stUR5.InducedJointError[2];
+				message[10] := Global.stUR5.InducedJointError[3];
+				message[11] := Global.stUR5.InducedJointError[4];
+				message[12] := Global.stUR5.InducedJointError[5];
+				message[13] := Global.stUR5.InducedJointError[6];
+			ELSIF Robot='UR3' THEN
+				mbWrite.sIPAddr := Global.stUR3.IP;
+				mbWrite.nTCPPort := Global.stUR3.mbPort;
+				mbWrite.nUnitID := Global.stUR3.unitID;
+				
+				message[7] := Global.stUR3.InducedJErrorType;
+				message[8] := Global.stUR3.InducedJointError[1];
+				message[9] := Global.stUR3.InducedJointError[2];
+				message[10] := Global.stUR3.InducedJointError[3];
+				message[11] := Global.stUR3.InducedJointError[4];
+				message[12] := Global.stUR3.InducedJointError[5];
+				message[13] := Global.stUR3.InducedJointError[6];
+			END_IF
+			
+			// source and destination information
+			mbWrite.pSrcAddr := ADR(message);
+			mbWrite.nMBAddr := 140;
+			
+			// Execute MODBUS Write
+			mbWrite.bExecute := TRUE;
+			
+			// Set fuctionblock busy bit
+			bBusy := TRUE;
+			
+			// Advance to waiting for completion state
+			state := 10;
+		10:
+			IF NOT mbWrite.bBusy THEN
+				mbWrite.bExecute :=FALSE;
+				bBusy := FALSE;
+				state := 0;
+			END_IF
+	END_CASE
+	
+	// Run function block
+	mbWrite();
+
+END_IF]]></ST>
+    </Implementation>
+    <LineIds Name="FB_mbWriteRobotTask">
+      <LineId Id="105" Count="0" />
+      <LineId Id="267" Count="1" />
+      <LineId Id="102" Count="1" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="208" Count="0" />
+      <LineId Id="121" Count="1" />
+      <LineId Id="213" Count="0" />
+      <LineId Id="239" Count="0" />
+      <LineId Id="214" Count="0" />
+      <LineId Id="395" Count="0" />
+      <LineId Id="216" Count="1" />
+      <LineId Id="290" Count="0" />
+      <LineId Id="218" Count="0" />
+      <LineId Id="289" Count="0" />
+      <LineId Id="309" Count="0" />
+      <LineId Id="330" Count="0" />
+      <LineId Id="220" Count="0" />
+      <LineId Id="240" Count="0" />
+      <LineId Id="222" Count="8" />
+      <LineId Id="359" Count="7" />
+      <LineId Id="231" Count="3" />
+      <LineId Id="367" Count="7" />
+      <LineId Id="235" Count="1" />
+      <LineId Id="249" Count="0" />
+      <LineId Id="237" Count="0" />
+      <LineId Id="248" Count="0" />
+      <LineId Id="242" Count="1" />
+      <LineId Id="124" Count="0" />
+      <LineId Id="244" Count="1" />
+      <LineId Id="189" Count="0" />
+      <LineId Id="247" Count="0" />
+      <LineId Id="246" Count="0" />
+      <LineId Id="127" Count="0" />
+      <LineId Id="125" Count="1" />
+      <LineId Id="128" Count="0" />
+      <LineId Id="188" Count="0" />
+      <LineId Id="130" Count="0" />
+      <LineId Id="129" Count="0" />
+      <LineId Id="123" Count="0" />
+      <LineId Id="48" Count="0" />
+      <LineId Id="96" Count="0" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="211" Count="1" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

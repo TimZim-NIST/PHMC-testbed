@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Crc="2917130706" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{d9ebe779-d6c2-479f-9667-0da584e635f8}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>TwinCAT3SafePlcProject</RootNamespace>
+    <AssemblyName>TwinCAT3SafePlcProject</AssemblyName>
+    <FileUpgradeFlags />
+    <UpgradeBackupLocation />
+    <OldToolsVersion>2.0</OldToolsVersion>
+    <TargetSystem>EL6900</TargetSystem>
+    <ProgrammingLanguage>Graphical Editor</ProgrammingLanguage>
+    <Worker>Administrator</Worker>
+    <IntProjName>TestBedSafety_V1</IntProjName>
+    <SPlcProjVersion>1.1.0.0</SPlcProjVersion>
+    <NextSdsId>27</NextSdsId>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugSymbols>false</DebugSymbols>
+    <OutputPath>bin\Release\</OutputPath>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="TwinSafeGroup1\Alias Devices\ProgModeActive.sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\EStopMCRCond.sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\SafeStopMCRCond.sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\RedSpeedMCRCond.sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\ErrorAcknowledgement.sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\In - Robot E-Stop Cond. (EL1904) - Module 1 (FSOES).sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\In - Cell E-Stops and Mats (EL1904) - Module 1 (FSOES).sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\In - SLA (EL1904) - Module 1 (FSOES).sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\In - SLB (EL1904) - Module 1 (FSOES).sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\Out - Robot State (EL2904) - Module 1 (FSOES).sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\Control E-Stop and Reset (EL1904) - Module 1 (FSOES).sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\Control Prog. Mode (EL1904) - Module 1 (FSOES).sds" />
+    <None Include="TwinSafeGroup1\TwinSafeGroup1.sal" />
+    <None Include="TwinSafeGroup1\TwinSafeGroup1.sal.diagram">
+      <DependentUpon>TwinSafeGroup1\TwinSafeGroup1.sal</DependentUpon>
+      <Visible>false</Visible>
+    </None>
+    <None Include="TargetSystemConfig.xml">
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="TwinSafeGroup1" />
+    <Folder Include="TwinSafeGroup1\Alias Devices" />
+  </ItemGroup>
+</Project>

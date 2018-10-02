@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_RobotTaskStatusInfo" Id="{bbf64d41-11d2-4340-b1fa-413ea3a7f148}">
+    <Declaration><![CDATA[TYPE ST_RobotTaskStatusInfo :
+STRUCT
+	nRobotTaskStatus : WORD;
+	nZoneOccupied : WORD;
+	bInTask : BOOL;
+	bPerformingTaskAction : BOOL;
+	sRobotStatus : STRING;
+
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

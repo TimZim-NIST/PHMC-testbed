@@ -1,0 +1,192 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="MAIN" Id="{5c12abd9-0d27-431f-9a5a-1bee0375886f}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR
+	// Data Recording
+	fbUR5tcp : FB_RobotTCPReceive := (Robot := 'UR5');
+	fbUR3tcp : FB_RobotTCPReceive := (Robot := 'UR3');
+	eRobotDataRecordingState : E_RobotDataRecordingStates;
+	
+	
+	// Optoforce
+	fbRecFTData : FB_FT_UDPConnection;
+
+	
+	// Triggers
+	StartTrig: R_TRIG;
+	StopTrig: F_TRIG;
+	
+	// Procees State Machine
+	eProcessMode : E_ProcessModes;
+	sProcessState : STRING;
+	
+
+	
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(* =======================================================
+Update veriables on every cycle
+======================================================= *)
+// Record time every cycle
+Global.nCurrentTime := F_GetSystemTime();
+
+// Triggers for start and stop buttons on control pendant
+StartTrig(CLK := Global.pbStart); // Start
+StopTrig(CLK := Global.pbStop); // Stop
+
+(* =======================================================
+Process Mode State Machine 
+======================================================= *)
+// Interrupts
+	// Stop Button
+	IF StopTrig.Q OR Global.bCycleStop THEN 
+		eProcessMode := E_ProcessModes.Stopping;
+		Global.bCycleStop := FALSE;
+	END_IF
+// State Machine
+CASE eProcessMode OF
+	E_ProcessModes.Idle:
+		sProcessState := 'Idle';
+		// Wait for start button to trigger
+		IF StartTrig.Q OR Global.bCycleStart THEN
+			eProcessMode := E_ProcessModes.Running;
+			Global.bCycleStart := FALSE;
+		END_IF
+		Global.indStartPB := FALSE;
+		Global.indStopPB := TRUE;
+		
+	E_ProcessModes.Running:
+		sProcessState := 'Assigning Tasks';
+		Global.bActivateTaskAssignment := TRUE;
+		Global.indStartPB := TRUE;
+		Global.indStopPB := FALSE;
+	E_ProcessModes.Stopping:
+		sProcessState := 'Performing Last Tasks';
+		Global.bActivateTaskAssignment := FALSE;
+		eProcessMode := E_ProcessModes.Idle;
+END_CASE
+
+(* =======================================================
+Data Collection Processes
+======================================================= *)
+
+
+// Enable TCP/IP Data collection from robots
+fbUR5tcp.bEnable := Global.bActivateTCPIPDataCollection;
+fbUR3tcp.bEnable := Global.bActivateTCPIPDataCollection;
+IF Global.bActivateTCPIPDataCollection THEN
+	fbUR5tcp.bRecordData := Global.bActivateTCPIPDataRecording;
+	fbUR3tcp.bRecordData := Global.bActivateTCPIPDataRecording;
+ELSE
+	fbUR5tcp.bRecordData := FALSE;
+	fbUR3tcp.bRecordData := FALSE;
+END_IF
+
+
+// Enable UDP Data collection from Force and Torque Sensor
+fbRecFTData.bEnable := Global.bActivateFTDataCollection;
+IF Global.bActivateFTDataCollection THEN
+	fbRecFTData.bRecordData := Global.bActivateFTDataRecording;
+ELSE
+	fbRecFTData.bRecordData := FALSE;
+END_IF
+
+(* =======================================================
+Function block Calls
+======================================================= *)
+fbUR5tcp();
+fbUR3tcp();
+fbRecFTData(stOptoforceData => Global.stFTData );
+
+(* =======================================================
+Sub-programs that run all the time
+======================================================= *)
+P_Safety(); // Handle Safety Funftions and collects safety related data
+P_InputOutputHandling();
+P_TaskHandling();
+
+(* =======================================================
+Automated Experiment Data Cleaning / Reset
+======================================================= *)
+IF Global.bResetPartCount THEN
+	Global.nPartsStarted := 0;
+	Global.nPartsCompleted := 0;
+	Global.nTotalPartTime := 0;
+	Global.nAveragePartTime := 0;
+	Global.bResetPartCount := FALSE;
+END_IF]]></ST>
+    </Implementation>
+    <LineIds Name="MAIN">
+      <LineId Id="151" Count="1" />
+      <LineId Id="126" Count="0" />
+      <LineId Id="102" Count="0" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="73" Count="0" />
+      <LineId Id="42" Count="0" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="137" Count="1" />
+      <LineId Id="149" Count="1" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="602" Count="0" />
+      <LineId Id="140" Count="1" />
+      <LineId Id="654" Count="0" />
+      <LineId Id="142" Count="0" />
+      <LineId Id="114" Count="1" />
+      <LineId Id="127" Count="0" />
+      <LineId Id="287" Count="0" />
+      <LineId Id="147" Count="0" />
+      <LineId Id="129" Count="0" />
+      <LineId Id="143" Count="0" />
+      <LineId Id="655" Count="0" />
+      <LineId Id="144" Count="0" />
+      <LineId Id="172" Count="0" />
+      <LineId Id="174" Count="1" />
+      <LineId Id="130" Count="0" />
+      <LineId Id="288" Count="0" />
+      <LineId Id="131" Count="0" />
+      <LineId Id="173" Count="0" />
+      <LineId Id="176" Count="0" />
+      <LineId Id="132" Count="0" />
+      <LineId Id="289" Count="0" />
+      <LineId Id="133" Count="0" />
+      <LineId Id="177" Count="0" />
+      <LineId Id="128" Count="0" />
+      <LineId Id="135" Count="0" />
+      <LineId Id="43" Count="0" />
+      <LineId Id="157" Count="1" />
+      <LineId Id="507" Count="1" />
+      <LineId Id="44" Count="0" />
+      <LineId Id="567" Count="0" />
+      <LineId Id="569" Count="0" />
+      <LineId Id="572" Count="1" />
+      <LineId Id="575" Count="3" />
+      <LineId Id="574" Count="0" />
+      <LineId Id="570" Count="0" />
+      <LineId Id="568" Count="0" />
+      <LineId Id="224" Count="0" />
+      <LineId Id="626" Count="0" />
+      <LineId Id="225" Count="0" />
+      <LineId Id="228" Count="2" />
+      <LineId Id="232" Count="0" />
+      <LineId Id="18" Count="0" />
+      <LineId Id="148" Count="0" />
+      <LineId Id="153" Count="1" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="33" Count="0" />
+      <LineId Id="124" Count="0" />
+      <LineId Id="222" Count="0" />
+      <LineId Id="121" Count="0" />
+      <LineId Id="155" Count="1" />
+      <LineId Id="122" Count="1" />
+      <LineId Id="481" Count="0" />
+      <LineId Id="178" Count="0" />
+      <LineId Id="656" Count="4" />
+      <LineId Id="662" Count="2" />
+      <LineId Id="688" Count="0" />
+      <LineId Id="661" Count="0" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,110 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="F_RecForceModeData" Id="{c72dcb1c-3413-4b8f-bf0b-4fb67b127058}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION F_RecForceModeData : ST_ForceModeData								// Different for different structures
+VAR_INPUT
+	data: ARRAY [1..500] OF BYTE;
+END_VAR
+VAR
+	nNumOfVar: UINT;
+	nIndex: UINT;
+	pAddrTo: POINTER TO ST_ForceModeData;
+	nAddrTo: POINTER TO ST_ForceModeData;
+	PAddrFrom: POINTER TO ARRAY [1..500] OF BYTE;
+	nByteCount: UINT;
+	
+	n2Byte : UINT;
+	n4Byte : UDINT;
+	n8Byte : ULINT;
+	adr2Byte: POINTER TO UINT;
+	adr4Byte: POINTER TO UDINT;
+	adr8Byte: POINTER TO ULINT;
+	nCurrentVarLength: USINT;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[nNumOfVar := SIZEOF(F_RecForceModeData.arrVarLength);						// Different for different structures
+pAddrTo := ADR(F_RecForceModeData);											// Different for different structures
+PAddrFrom := ADR(data);
+adr2Byte := ADR(n2Byte);
+adr4Byte := ADR(n4Byte);
+adr8Byte := ADR(n8Byte);
+
+FOR nIndex := 1 TO nNumOfVar DO
+	nCurrentVarLength := F_RecForceModeData.arrVarLength[nIndex];			// Different for different structures
+	
+	(* Determine byte address to save item to *)
+	nByteCount := nByteCount + nCurrentVarLength;
+	IF nByteCount=8 THEN
+		pAddrTo := pAddrTo;
+		nByteCount := 0;
+	ELSIF nByteCount>8 THEN
+		pAddrTo := pAddrTo + 16 - nByteCount;
+		nByteCount := 0;
+	ELSE
+		pAddrTo := pAddrTo;
+	END_IF
+	nAddrTo := F_FindAddr(pAddrTo,nByteCount);
+	
+	(* Convert Data based on size of item (in bytes) *)
+	IF nCurrentVarLength=8 THEN
+		MEMCPY(adr8Byte, pAddrFrom, 8);
+		n8Byte := BE64_TO_HOSTEX(n8Byte);
+		MEMCPY(pAddrTo, adr8Byte, 8);
+	ELSIF nCurrentVarLength=4 THEN
+		MEMCPY(adr4Byte, pAddrFrom, 8);
+		n4Byte := BE32_TO_HOST(n4Byte);
+		MEMCPY(pAddrTo, adr4Byte, 8);
+	ELSIF nCurrentVarLength=2 THEN
+		MEMCPY(adr2Byte, pAddrFrom, 8);
+		n2Byte := BE16_TO_HOST(n2Byte);
+		MEMCPY(pAddrTo, adr2Byte, 8);
+	ELSE
+		MEMCPY( pAddrTo, pAddrFrom, nCurrentVarLength);
+	END_IF
+	
+	(* Increment addressed of interest *)
+	pAddrFrom := PAddrFrom + nCurrentVarLength;
+	pAddrTo := pAddrTo + nCurrentVarLength;
+END_FOR]]></ST>
+    </Implementation>
+    <LineIds Name="F_RecForceModeData">
+      <LineId Id="9" Count="0" />
+      <LineId Id="19" Count="0" />
+      <LineId Id="68" Count="1" />
+      <LineId Id="71" Count="0" />
+      <LineId Id="44" Count="0" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="98" Count="0" />
+      <LineId Id="100" Count="1" />
+      <LineId Id="104" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="124" Count="2" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="47" Count="0" />
+      <LineId Id="40" Count="2" />
+      <LineId Id="149" Count="0" />
+      <LineId Id="36" Count="0" />
+      <LineId Id="102" Count="0" />
+      <LineId Id="21" Count="1" />
+      <LineId Id="65" Count="0" />
+      <LineId Id="74" Count="0" />
+      <LineId Id="24" Count="0" />
+      <LineId Id="75" Count="0" />
+      <LineId Id="25" Count="0" />
+      <LineId Id="77" Count="0" />
+      <LineId Id="26" Count="0" />
+      <LineId Id="76" Count="0" />
+      <LineId Id="27" Count="0" />
+      <LineId Id="78" Count="0" />
+      <LineId Id="59" Count="1" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="79" Count="0" />
+      <LineId Id="103" Count="0" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="7" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

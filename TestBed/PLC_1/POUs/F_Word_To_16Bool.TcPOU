@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="F_Word_To_16Bool" Id="{1693b3c7-286d-4cc9-a582-6992f8ace142}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION F_Word_To_16Bool : ST_16Bool
+VAR_INPUT
+	value : WORD;
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[F_Word_To_16Bool.var1 := INT_TO_BOOL(2#0000_0000_0000_0001 AND value);
+F_Word_To_16Bool.var2 := INT_TO_BOOL(2#0000_0000_0000_0010 AND value);
+F_Word_To_16Bool.var3 := INT_TO_BOOL(2#0000_0000_0000_0100 AND value);
+F_Word_To_16Bool.var4 := INT_TO_BOOL(2#0000_0000_0000_1000 AND value);
+F_Word_To_16Bool.var5 := INT_TO_BOOL(2#0000_0000_0001_0000 AND value);
+F_Word_To_16Bool.var6 := INT_TO_BOOL(2#0000_0000_0010_0000 AND value);
+F_Word_To_16Bool.var7 := INT_TO_BOOL(2#0000_0000_0100_0000 AND value);
+F_Word_To_16Bool.var8 := INT_TO_BOOL(2#0000_0000_1000_0000 AND value);
+F_Word_To_16Bool.var9 := INT_TO_BOOL(2#0000_0001_0000_0000 AND value);
+F_Word_To_16Bool.var10 := INT_TO_BOOL(2#0000_0010_0000_0000 AND value);
+F_Word_To_16Bool.var11 := INT_TO_BOOL(2#0000_0100_0000_0000 AND value);
+F_Word_To_16Bool.var12 := INT_TO_BOOL(2#0000_1000_0000_0000 AND value);
+F_Word_To_16Bool.var13 := INT_TO_BOOL(2#0001_0000_0000_0000 AND value);
+F_Word_To_16Bool.var14 := INT_TO_BOOL(2#0010_0000_0000_0000 AND value);
+F_Word_To_16Bool.var15 := INT_TO_BOOL(2#0100_0000_0000_0000 AND value);
+F_Word_To_16Bool.var16 := INT_TO_BOOL(2#1000_0000_0000_0000 AND value);]]></ST>
+    </Implementation>
+    <LineIds Name="F_Word_To_16Bool">
+      <LineId Id="13" Count="14" />
+      <LineId Id="7" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

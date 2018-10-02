@@ -1,0 +1,51 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_Part" Id="{b01509c0-2143-4296-bf5f-3030e3ff3925}">
+    <Declaration><![CDATA[TYPE ST_Part :
+STRUCT
+	// Part State
+	bExists : BOOL;
+	bComplete : BOOL;
+	
+	// Part Attributes
+	nPartType : WORD;
+	
+	// Process Time
+	rtUR3TimePartAdded : LWORD;
+	rtUR5TimePartAdded : LWORD;
+	ntPartAdded : ULINT;
+	
+	// Pick and Place from Input to WF
+	ntPickFromInputAssigned : ULINT;
+	ntInputPartPicked : ULINT;
+	ntInputPartPlaced : ULINT;
+	ntPlaceInWFComplete : ULINT;
+	
+	// Task on Part
+	ntTaskAssigned : ULINT;
+	ntTaskActionStart : ULINT;
+	ntTaskActionComplete : ULINT;
+	ntTaskComplete : ULINT;
+	
+	// Pick and Place from WF to Output
+	ntPickFromWFAssigned : ULINT;
+	ntOutputPartPicked : ULINT;
+	ntOutputPartPlaced : ULINT;
+	ntPlaceInOutputComplete : ULINT;
+	
+	// Part removed from cell
+	ntPartRemoved : ULINT;
+	
+	// Process Record Data
+	ntTimeInWorkfixture : REAL;
+	nWorkFixture : WORD;
+	nInputPosition : WORD;
+	nOutputPosition : WORD;
+	nPartNumber : WORD;
+	
+	
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

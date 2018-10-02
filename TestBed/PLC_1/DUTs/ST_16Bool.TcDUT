@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_16Bool" Id="{11373995-9652-4922-baed-2832c9d35fe3}">
+    <Declaration><![CDATA[TYPE ST_16Bool :
+STRUCT
+	var1 : BOOL;
+	var2 : BOOL;
+	var3 : BOOL;
+	var4 : BOOL;
+	var5 : BOOL;
+	var6 : BOOL;
+	var7 : BOOL;
+	var8 : BOOL;
+	var9 : BOOL;
+	var10 : BOOL;
+	var11 : BOOL;
+	var12 : BOOL;
+	var13 : BOOL;
+	var14 : BOOL;
+	var15 : BOOL;
+	var16 : BOOL;
+
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

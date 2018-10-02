@@ -1,0 +1,70 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_JointData" Id="{31c1a0ba-aeda-4041-a0fe-a446154ecc70}">
+    <Declaration><![CDATA[TYPE ST_JointData :
+STRUCT
+	// Joint Data (Value 1)
+	PackageLength: UDINT;
+	PackageType: USINT;
+	// Joint 1		
+		j1_qactual: LREAL;
+		j1_qtarget: LREAL;			
+		j1_qdactual: LREAL;			
+		j1_Iactual: REAL;		
+		j1_Vactual: REAL;			
+		j1_Tmotor: REAL;			
+		j1_Tmicro: REAL;	// Dont use obsolete
+		j1_JointMode: USINT; 
+	// Joint 2
+		j2_qactual: LREAL;
+		j2_qtarget: LREAL;			
+		j2_qdactual: LREAL;			
+		j2_Iactual: REAL;		
+		j2_Vactual: REAL;			
+		j2_Tmotor: REAL;			
+		j2_Tmicro: REAL;	// Dont use obsolete
+		j2_JointMode: USINT; 
+	// Joint 3
+		j3_qactual: LREAL;
+		j3_qtarget: LREAL;			
+		j3_qdactual: LREAL;			
+		j3_Iactual: REAL;		
+		j3_Vactual: REAL;			
+		j3_Tmotor: REAL;			
+		j3_Tmicro: REAL;	// Dont use obsolete
+		j3_JointMode: USINT; 
+	// Joint 4
+		j4_qactual: LREAL;
+		j4_qtarget: LREAL;			
+		j4_qdactual: LREAL;			
+		j4_Iactual: REAL;		
+		j4_Vactual: REAL;			
+		j4_Tmotor: REAL;			
+		j4_Tmicro: REAL;	// Dont use obsolete
+		j4_JointMode: USINT; 
+	// Joint 5
+		j5_qactual: LREAL;
+		j5_qtarget: LREAL;			
+		j5_qdactual: LREAL;			
+		j5_Iactual: REAL;		
+		j5_Vactual: REAL;			
+		j5_Tmotor: REAL;			
+		j5_Tmicro: REAL;	// Dont use obsolete
+		j5_JointMode: USINT; 
+	// Joint 6
+		j6_qactual: LREAL;
+		j6_qtarget: LREAL;			
+		j6_qdactual: LREAL;			
+		j6_Iactual: REAL;		
+		j6_Vactual: REAL;			
+		j6_Tmotor: REAL;			
+		j6_Tmicro: REAL;	// Dont use obsolete
+		j6_JointMode: USINT; 
+	
+	// Packet Item Length Info
+	arrVarLength: ARRAY [1..53] OF USINT := [4,1,3(8),4(4),1,3(8),4(4),1,3(8),4(4),1,3(8),4(4),1,3(8),4(4),1,3(8),4(4),1];
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

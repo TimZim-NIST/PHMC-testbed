@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="E_ProcessModes" Id="{d418126e-56e9-4083-8783-50173da7515a}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+TYPE E_ProcessModes :
+(
+	Idle,
+	Running,
+	Stopping
+);
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

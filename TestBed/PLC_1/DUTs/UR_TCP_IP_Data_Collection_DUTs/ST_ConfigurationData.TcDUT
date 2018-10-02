@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_ConfigurationData" Id="{9301d750-3f6b-4a88-be4d-f317117a1e2a}">
+    <Declaration><![CDATA[TYPE ST_ConfigurationData :
+STRUCT
+	// Configuration Data (Value 6)
+	PackageLength: UDINT;
+	PackageType: USINT;		
+	// Joint min and max position, speed and accel
+		JointMinMax: ARRAY [1..192] OF BYTE;		
+	// Default TCP and Tool speed and accel limits	
+		ToolLimits: ARRAY [1..32] OF BYTE;
+	// Other tool info	
+		EqRadius: LREAL;
+	// DH Parameters
+		DHa: ARRAY [1..6] OF LREAL;	
+		DHd: ARRAY [1..6] OF LREAL;							
+		DHalpha: ARRAY [1..6] OF LREAL;							
+		DHtheta: ARRAY [1..6] OF LREAL;				
+	// Other Robot info			
+		OtherConfigData: ARRAY [1..16] OF BYTE;		
+		
+arrVarLength: ARRAY [1..59] OF USINT := [4,1,6(8),6(8),6(8),6(8),5(8),6(8),6(8),6(8),6(8),4(4)];
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

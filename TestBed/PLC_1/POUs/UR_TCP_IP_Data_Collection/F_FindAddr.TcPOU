@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="F_FindAddr" Id="{6257a32b-62d9-4df0-b406-77555b3d6a65}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION F_FindAddr : POINTER TO BYTE
+VAR_INPUT
+	pAddrTo: POINTER TO BYTE;
+	nByteCount: UINT;
+END_VAR
+VAR
+
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF nByteCount=8 THEN
+	pAddrTo := pAddrTo;
+	nByteCount := 0;
+ELSIF nByteCount>8 THEN
+	pAddrTo := pAddrTo + 16 - nByteCount;
+	nByteCount := 0;
+ELSE
+	pAddrTo := pAddrTo;
+END_IF
+
+F_FindAddr := pAddrTo;]]></ST>
+    </Implementation>
+    <LineIds Name="F_FindAddr">
+      <LineId Id="8" Count="7" />
+      <LineId Id="20" Count="1" />
+      <LineId Id="7" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

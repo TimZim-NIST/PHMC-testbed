@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_OptoforceUDPData" Id="{a7bad870-32fd-41ca-93ee-5466559b77c9}">
+    <Declaration><![CDATA[TYPE ST_OptoforceUDPData :
+STRUCT
+	HS_sequence : UDINT; // The sequence number of the current HS UDP record
+	FT_sequence : UDINT; // The internal sample counter of the DAQ
+	Status : UDINT; // Status word of the sensor and DAQ
+	Fx : DINT; // X-axis force in 32 bit Counts*
+	Fy : DINT; // Y-axis force in 32 bit Counts*
+	Fz : DINT; // Z-axis force in 32 bit Counts*
+	Tx : DINT; // X-axis torque in 32 bit Counts* (0 if not available)
+	Ty : DINT; // Y-axis torque in 32 bit Counts* (0 if not available)
+	Tz : DINT; // Z-axis torque in 32 bit Counts* (0 if not available)
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

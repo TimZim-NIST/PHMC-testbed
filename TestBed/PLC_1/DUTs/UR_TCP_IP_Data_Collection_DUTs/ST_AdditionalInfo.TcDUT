@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_AdditionalInfo" Id="{40a2e345-6b40-4a53-93dd-1faaa7973c00}">
+    <Declaration><![CDATA[TYPE ST_AdditionalInfo :
+STRUCT
+	// Additional Info (Value 8)
+	AdditionalInfo: ARRAY [1..8] OF BYTE;
+
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

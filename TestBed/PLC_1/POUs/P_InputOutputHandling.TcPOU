@@ -1,0 +1,202 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="P_InputOutputHandling" Id="{bc38ce2a-1fe7-4329-beab-795b6a75e11d}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM P_InputOutputHandling
+VAR
+	// User Inputs
+	// Process Selection
+	nProcessType : INT := 1; // 1 = continuous, 2 = batch
+	sProcessType : STRING := 'Continuous';
+	bSwitchProcess : BOOL;
+	
+	bAutoLoad : BOOL;
+	bAutoUnload : BOOL := TRUE;
+	
+	// Continuous Process
+	InputTimer : TON;
+	OutputTimer : TON;
+	
+	// Batch Process
+	nBatchSize : INT := 1;
+	
+	// Loading and Unloading
+	bRemoveParts : BOOL;
+	bAddParts : BOOL;
+	nInputIndex : INT;
+	nOutputIndex : INT;
+	
+	// Data Recording
+	fbPartRecordWriter:	FB_CSV_PartDataWriter;
+	stLastPart : ST_Part;
+	bWriteLine:	BOOL;
+	sPartDataFileName:	STRING :='PartData';
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(* =======================================================
+Process Type Selection/Switching
+======================================================= *)
+IF bSwitchProcess THEN
+	bSwitchProcess := FALSE;
+	IF nProcessType = 1 THEN
+		nProcessType := 2;
+		sProcessType := 'Batch';
+	ELSIF nProcessType = 2 THEN
+		nProcessType := 1;
+		sProcessType := 'Continuous';
+	END_IF
+END_IF
+
+CASE nProcessType OF
+	// Continuous Process
+	1:	
+		nBatchSize := 1;
+		Global.nNumInputFixtures := nBatchSize;
+		Global.nNumOutputFixtures := nBatchSize;
+		
+		// Refilling Input 
+		IF bAutoLoad THEN
+			// TODO replace this portion of code with a prenense detention sensor
+			// to indicate a part available at the input
+			InputTimer(IN := NOT Global.arrInputFixtures[1].stPart.bExists, PT := T#5S);
+			IF InputTimer.Q THEN
+				bAddParts := TRUE;
+			END_IF
+		END_IF
+		IF bAutoUnload THEN
+			// Emptying Output
+			OutputTimer(IN := Global.arrOutputFixtures[1].stPart.bExists, PT := T#3S);
+			IF OutputTimer.Q THEN
+				bRemoveParts := TRUE;			
+			END_IF
+		END_IF
+	// Batch Process
+	2:
+	// TODO batch process loading and unloading
+	Global.nNumInputFixtures := nBatchSize;
+	Global.nNumOutputFixtures := nBatchSize;
+	
+	
+END_CASE
+
+(* =======================================================
+Adding and Removing Parts from WorkCell
+======================================================= *)
+IF bAddParts THEN
+	FOR nInputIndex := 1 TO Global.nNumInputFixtures DO
+		IF NOT Global.arrInputFixtures[1].stPart.bExists THEN
+			Global.arrInputFixtures[nInputIndex].stPart.ntPartAdded := Global.nCurrentTime;
+			Global.arrInputFixtures[nInputIndex].stPart.rtUR3TimePartAdded := Global.stUR3.RobotModeData.Timestamp;
+			Global.arrInputFixtures[nInputIndex].stPart.rtUR5TimePartAdded := Global.stUR5.RobotModeData.Timestamp;
+			Global.arrInputFixtures[nInputIndex].stPart.bExists := TRUE;
+			Global.nPartsStarted := Global.nPartsStarted + 1;
+			Global.arrInputFixtures[nInputIndex].stPart.nPartNumber := Global.nPartsStarted;
+			bAddParts := FALSE;
+		END_IF
+	END_FOR
+END_IF
+
+IF bRemoveParts THEN
+	FOR nOutputIndex := 1 TO Global.nNumOutputFixtures DO
+		IF Global.arrOutputFixtures[nOutputIndex].stPart.bExists THEN
+			Global.arrOutputFixtures[nOutputIndex].stPart.ntPartRemoved := Global.nCurrentTime;	
+		
+			// Record Part being removed
+			stLastPart := Global.arrOutputFixtures[nOutputIndex].stPart;
+			bWriteLine := TRUE; // initiate csv writer
+			
+			// Log times
+			Global.nTotalPartTime := Global.nTotalPartTime + (stLastPart.ntPartRemoved - stLastPart.ntPartAdded);
+			IF Global.nPartsCompleted > 0 THEN
+				Global.nAveragePartTime := ULINT_TO_LREAL((Global.nTotalPartTime / Global.nPartsCompleted))/10000000;
+			ELSE
+				Global.nAveragePartTime := ULINT_TO_LREAL(Global.nTotalPartTime)/10000000;
+			END_IF
+			
+			Global.nPartsCompleted := Global.nPartsCompleted + 1;
+			
+			// Log in internal log for visualization
+			MEMMOVE(destAddr := ADR(Global.CompletedParts[2]),srcAddr := ADR(Global.CompletedParts), n:= SIZEOF(stLastPart)*9);
+			MEMMOVE(destAddr := ADR(Global.CompletedParts[1]),srcAddr := ADR(stLastPart), n:= SIZEOF(stLastPart));
+			Global.arrOutputFixtures[nOutputIndex].stPart := Global.stNullPart;
+			
+			// Pos Check Part Counting
+			// Global.nPartsSincePosCheck := Global.nPartsSincePosCheck + 1;
+			
+		END_IF
+	END_FOR
+	bRemoveParts := FALSE;
+END_IF
+
+// TODO: make this work in batch mode. Currently will only record last part in for loop
+
+fbPartRecordWriter.bEnable := Global.bActivatePartDataRecording; 
+fbPartRecordWriter(	sFileName := sPartDataFileName,
+					stPartData := stLastPart);
+bWriteLine := FALSE;]]></ST>
+    </Implementation>
+    <LineIds Name="P_InputOutputHandling">
+      <LineId Id="67" Count="1" />
+      <LineId Id="61" Count="0" />
+      <LineId Id="69" Count="0" />
+      <LineId Id="71" Count="1" />
+      <LineId Id="74" Count="1" />
+      <LineId Id="77" Count="1" />
+      <LineId Id="73" Count="0" />
+      <LineId Id="70" Count="0" />
+      <LineId Id="62" Count="0" />
+      <LineId Id="79" Count="0" />
+      <LineId Id="85" Count="0" />
+      <LineId Id="80" Count="0" />
+      <LineId Id="140" Count="2" />
+      <LineId Id="199" Count="0" />
+      <LineId Id="107" Count="0" />
+      <LineId Id="200" Count="0" />
+      <LineId Id="108" Count="2" />
+      <LineId Id="114" Count="2" />
+      <LineId Id="100" Count="0" />
+      <LineId Id="202" Count="0" />
+      <LineId Id="137" Count="0" />
+      <LineId Id="129" Count="1" />
+      <LineId Id="133" Count="0" />
+      <LineId Id="132" Count="0" />
+      <LineId Id="201" Count="0" />
+      <LineId Id="84" Count="0" />
+      <LineId Id="82" Count="0" />
+      <LineId Id="136" Count="0" />
+      <LineId Id="88" Count="0" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="83" Count="0" />
+      <LineId Id="143" Count="0" />
+      <LineId Id="81" Count="0" />
+      <LineId Id="65" Count="1" />
+      <LineId Id="119" Count="1" />
+      <LineId Id="138" Count="0" />
+      <LineId Id="135" Count="0" />
+      <LineId Id="121" Count="1" />
+      <LineId Id="233" Count="1" />
+      <LineId Id="123" Count="4" />
+      <LineId Id="151" Count="0" />
+      <LineId Id="153" Count="0" />
+      <LineId Id="117" Count="0" />
+      <LineId Id="154" Count="0" />
+      <LineId Id="118" Count="0" />
+      <LineId Id="155" Count="0" />
+      <LineId Id="16" Count="5" />
+      <LineId Id="161" Count="0" />
+      <LineId Id="22" Count="12" />
+      <LineId Id="265" Count="2" />
+      <LineId Id="35" Count="0" />
+      <LineId Id="160" Count="0" />
+      <LineId Id="152" Count="0" />
+      <LineId Id="162" Count="0" />
+      <LineId Id="157" Count="0" />
+      <LineId Id="163" Count="0" />
+      <LineId Id="168" Count="0" />
+      <LineId Id="298" Count="1" />
+      <LineId Id="164" Count="0" />
+      <LineId Id="166" Count="1" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

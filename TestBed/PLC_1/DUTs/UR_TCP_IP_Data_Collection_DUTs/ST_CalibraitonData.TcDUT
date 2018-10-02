@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_CalibraitonData" Id="{b4fa63d2-72af-4b3e-8baf-380f07e56ee9}">
+    <Declaration><![CDATA[TYPE ST_CalibraitonData :
+STRUCT
+	// Calibration Data (Value 9)
+	CalibrationData: ARRAY [1..53] OF BYTE;		
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

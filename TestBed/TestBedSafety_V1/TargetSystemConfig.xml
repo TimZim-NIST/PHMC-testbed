@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TargetSystemConfig Crc="594402446" Version="1.3">
+  <TargetSystemType>HSafetyPLC</TargetSystemType>
+  <TargetSystemSubType>EL6900</TargetSystemSubType>
+  <IsExternalDevice>false</IsExternalDevice>
+  <TargetSystemObjectId>50462722</TargetSystemObjectId>
+  <TargetSystemObjectName>SafetyPLC (EL6900)</TargetSystemObjectName>
+  <SoftwareVersion>05</SoftwareVersion>
+  <SerialNumber>1190857</SerialNumber>
+  <ProjectCRC>7598</ProjectCRC>
+  <MapProjectCRC>false</MapProjectCRC>
+  <MapSerialNumber>false</MapSerialNumber>
+  <VersionNumber>1</VersionNumber>
+  <FSOEAddress>1</FSOEAddress>
+  <DipSwitch>1</DipSwitch>
+  <AmsNetID>5.43.59.116.2.1</AmsNetID>
+  <AmsPort>1001</AmsPort>
+  <ConnectionInfoDataConfigOld>false</ConnectionInfoDataConfigOld>
+  <BackupRestore Needed="0" Activated="false" />
+</TargetSystemConfig>

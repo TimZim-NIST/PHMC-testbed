@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="E_RobotDataRecordingStates" Id="{1c1aafa5-103c-4773-90a0-4c89432e7e5d}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+TYPE E_RobotDataRecordingStates :
+(
+	Idle,
+	CollectData,
+	CollectData_Wait,
+	RecordData,
+	RecordData_Wait,
+	HandleError
+);
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

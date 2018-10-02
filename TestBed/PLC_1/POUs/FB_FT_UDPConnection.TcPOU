@@ -1,0 +1,250 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="FB_FT_UDPConnection" Id="{16fc72e4-3204-4bf6-a8d0-49acc4ec8e4a}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_FT_UDPConnection
+VAR_INPUT
+	bEnable : BOOL;
+	Robot : STRING;
+	bRecordData : BOOL;
+	
+END_VAR
+VAR_OUTPUT
+	bBusy : BOOL;
+	bConnected : BOOL;
+	bInitialized : BOOL;
+	bError : BOOL;
+	stOptoforceData : ST_OptoforceUDPData;
+END_VAR
+VAR
+	stRequest : ST_OptoforceUDPRequest := (Header := 4660, Command := 2, Data := 0);
+	fbConnectionlessSocket : FB_ConnectionlessSocket;
+	fbSocketUdpCreate : FB_SocketUdpCreate := (sSrvNetId := '', tTimeout := DEFAULT_ADS_TIMEOUT);
+	fbSocketUdpSendTo : FB_SocketUdpSendTo := (sSrvNetId := '', tTimeout := DEFAULT_ADS_TIMEOUT);
+	fbSocketUdpReceiveFrom : FB_SocketUdpReceiveFrom := (sSrvNetId := '', tTimeout := DEFAULT_ADS_TIMEOUT);
+	fbSocketClose : FB_SocketClose := (sSrvNetId := '', tTimeout := DEFAULT_ADS_TIMEOUT);
+	eState : E_UDPConnection;
+	hSocket : T_HSOCKET;
+	receivebuffer : ARRAY [1..9] OF UDINT;
+	sendbuffer : ST_OptoforceUDPRequest;
+	index: INT;
+	fbRecordFTData : FB_CSV_FTDataWriter;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[CASE eState OF
+	E_UDPConnection.Idle:
+		IF bEnable THEN
+			bBusy := TRUE;
+			IF NOT bConnected THEN
+				eState := E_UDPConnection.Connect_Start;
+			ELSIF NOT bInitialized THEN
+				eState := E_UDPConnection.Request_Start;
+			ELSE
+				eState := E_UDPConnection.Receive_Start;
+			END_IF
+		ELSIF bConnected THEN
+			eState := E_UDPConnection.Close_Start;
+		END_IF
+	E_UDPConnection.Connect_Start:
+		fbSocketUdpCreate.bExecute := TRUE;
+		//fbSocketUdpCreate.nLocalPort := 200;
+		eState := E_UDPConnection.Connect_Wait;
+	E_UDPConnection.Connect_Wait:
+		fbSocketUdpCreate.bExecute := FALSE;
+		IF fbSocketUdpCreate.bError THEN
+			eState := E_UDPConnection.HandleError;
+		ELSIF NOT fbSocketUdpCreate.bBusy THEN
+			bConnected := TRUE;
+			hSocket := fbSocketUdpCreate.hSocket;
+			eState := E_UDPConnection.Idle;
+		END_IF
+	E_UDPConnection.Request_Start:
+		sendbuffer.Command := HOST_TO_BE16(stRequest.Command);
+		sendbuffer.Header := HOST_TO_BE16(stRequest.Header);
+		sendbuffer.Data := HOST_TO_BE32(stRequest.Data);
+	
+		fbSocketUdpSendTo.bExecute := TRUE;
+		fbSocketUdpSendTo.hSocket := hSocket;
+		
+		fbSocketUdpSendTo.pSrc := ADR(sendbuffer);
+		fbSocketUdpSendTo.cbLen := SIZEOF(sendbuffer);
+		
+		fbSocketUdpSendTo.sRemoteHost := '192.168.1.1';
+		fbSocketUdpSendTo.nRemotePort := 49152;
+		
+		eState := E_UDPConnection.Request_Wait;
+		
+	E_UDPConnection.Request_Wait:
+		fbSocketUdpSendTo.bExecute := FALSE;
+		
+		IF fbSocketUdpSendTo.bError THEN
+			eState := E_UDPConnection.HandleError;
+		ELSIF NOT fbSocketUdpSendTo.bBusy THEN
+			bInitialized := TRUE;
+			eState := E_UDPConnection.Idle;
+		END_IF
+		
+	E_UDPConnection.Receive_Start:
+		fbSocketUdpReceiveFrom.bExecute := TRUE;
+		fbSocketUdpReceiveFrom.hSocket := hSocket;
+		
+		fbSocketUdpReceiveFrom.cbLen := SIZEOF(receivebuffer);
+		fbSocketUdpReceiveFrom.pDest := ADR(receivebuffer);
+		
+		eState := E_UDPConnection.Receive_Wait;
+		
+	E_UDPConnection.Receive_Wait:
+		fbSocketUdpReceiveFrom.bExecute := FALSE;
+		IF fbSocketUdpReceiveFrom.bError THEN
+			eState := E_UDPConnection.HandleError;
+		ELSIF NOT fbSocketUdpReceiveFrom.bBusy THEN
+			IF fbSocketUdpReceiveFrom.nRecBytes=36 THEN
+				FOR index:=1 TO 9 DO
+					receivebuffer[index] := BE32_TO_HOST(receivebuffer[index]);
+				END_FOR
+				MEMCPY(srcAddr := ADR(receivebuffer), destAddr := ADR(stOptoforceData), n := 36);
+				(*// Do data conversion to Newtons and N-m
+				stOptoforceData.Fx := stOptoforceData.Fx/10000;
+				stOptoforceData.Fy := stOptoforceData.Fy/10000;
+				stOptoforceData.Fz := stOptoforceData.Fz/10000;
+				stOptoforceData.Tx := stOptoforceData.Tx/100000;
+				stOptoforceData.Ty := stOptoforceData.Ty/100000;
+				stOptoforceData.Tz := stOptoforceData.Tz/100000;
+				*)
+				IF bRecordData THEN
+					eState := E_UDPConnection.RecordData;
+				ELSE
+					eState := E_UDPConnection.Idle;
+				END_IF
+			ELSE
+				eState := E_UDPConnection.Idle;
+			END_IF
+		END_IF
+		
+	E_UDPConnection.RecordData:
+		fbRecordFTData.bEnable := TRUE;
+		fbRecordFTData.sFileName := 'FTData';
+		fbRecordFTData.stFTData := stOptoforceData;
+		IF NOT fbRecordFTData.bBusy THEN
+			eState := E_UDPConnection.Idle;
+		END_IF
+		
+	E_UDPConnection.Close_Start:
+		fbSocketClose.bExecute := TRUE;
+		fbSocketClose.hSocket := hSocket;
+		
+		eState := E_UDPConnection.Close_Wait;
+	
+	E_UDPConnection.Close_Wait:
+		fbSocketClose.bExecute := FALSE;
+		IF fbSocketClose.bError THEN
+				eState := E_UDPConnection.HandleError;
+		ELSIF NOT fbSocketClose.bBusy THEN
+			MEMSET(ADR(hSocket),0,SIZEOF(hSocket));
+			bBusy := FALSE;
+			bConnected := FALSE;
+			bInitialized := FALSE;
+			bError := FALSE;
+			eState := E_UDPConnection.Idle;
+		END_IF
+		
+	E_UDPConnection.HandleError:
+		eState := E_UDPConnection.Close_Start;
+END_CASE
+
+fbSocketUdpCreate();
+fbConnectionlessSocket();
+fbSocketUdpSendTo();
+fbSocketUdpReceiveFrom();
+fbSocketClose();
+fbRecordFTData();
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_FT_UDPConnection">
+      <LineId Id="12" Count="0" />
+      <LineId Id="25" Count="4" />
+      <LineId Id="108" Count="0" />
+      <LineId Id="107" Count="0" />
+      <LineId Id="30" Count="4" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="40" Count="0" />
+      <LineId Id="157" Count="0" />
+      <LineId Id="49" Count="0" />
+      <LineId Id="17" Count="0" />
+      <LineId Id="156" Count="0" />
+      <LineId Id="51" Count="6" />
+      <LineId Id="86" Count="0" />
+      <LineId Id="186" Count="0" />
+      <LineId Id="188" Count="1" />
+      <LineId Id="187" Count="0" />
+      <LineId Id="87" Count="0" />
+      <LineId Id="89" Count="0" />
+      <LineId Id="161" Count="0" />
+      <LineId Id="91" Count="0" />
+      <LineId Id="160" Count="0" />
+      <LineId Id="162" Count="0" />
+      <LineId Id="93" Count="0" />
+      <LineId Id="159" Count="0" />
+      <LineId Id="163" Count="0" />
+      <LineId Id="116" Count="0" />
+      <LineId Id="164" Count="0" />
+      <LineId Id="18" Count="0" />
+      <LineId Id="165" Count="1" />
+      <LineId Id="60" Count="0" />
+      <LineId Id="99" Count="0" />
+      <LineId Id="98" Count="0" />
+      <LineId Id="106" Count="0" />
+      <LineId Id="104" Count="0" />
+      <LineId Id="96" Count="0" />
+      <LineId Id="167" Count="0" />
+      <LineId Id="19" Count="0" />
+      <LineId Id="117" Count="0" />
+      <LineId Id="101" Count="0" />
+      <LineId Id="168" Count="0" />
+      <LineId Id="110" Count="1" />
+      <LineId Id="169" Count="0" />
+      <LineId Id="115" Count="0" />
+      <LineId Id="170" Count="0" />
+      <LineId Id="97" Count="0" />
+      <LineId Id="171" Count="0" />
+      <LineId Id="118" Count="2" />
+      <LineId Id="179" Count="0" />
+      <LineId Id="191" Count="2" />
+      <LineId Id="180" Count="0" />
+      <LineId Id="257" Count="0" />
+      <LineId Id="255" Count="0" />
+      <LineId Id="259" Count="4" />
+      <LineId Id="258" Count="0" />
+      <LineId Id="267" Count="0" />
+      <LineId Id="223" Count="0" />
+      <LineId Id="268" Count="2" />
+      <LineId Id="329" Count="1" />
+      <LineId Id="181" Count="0" />
+      <LineId Id="124" Count="0" />
+      <LineId Id="174" Count="1" />
+      <LineId Id="21" Count="0" />
+      <LineId Id="299" Count="0" />
+      <LineId Id="331" Count="0" />
+      <LineId Id="224" Count="0" />
+      <LineId Id="265" Count="1" />
+      <LineId Id="225" Count="0" />
+      <LineId Id="66" Count="2" />
+      <LineId Id="176" Count="0" />
+      <LineId Id="69" Count="6" />
+      <LineId Id="77" Count="1" />
+      <LineId Id="177" Count="0" />
+      <LineId Id="153" Count="0" />
+      <LineId Id="79" Count="3" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="126" Count="0" />
+      <LineId Id="158" Count="0" />
+      <LineId Id="127" Count="0" />
+      <LineId Id="129" Count="2" />
+      <LineId Id="264" Count="0" />
+      <LineId Id="128" Count="0" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="ST_PackageInfo" Id="{3b435365-bc0b-4660-820d-56ee31694968}">
+    <Declaration><![CDATA[TYPE ST_PackageInfo :
+STRUCT
+	PackageLength: UDINT;
+	MessageType: USINT;
+END_STRUCT
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

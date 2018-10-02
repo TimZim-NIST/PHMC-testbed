@@ -1,0 +1,108 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="P_Safety" Id="{d6dc37aa-e9ee-49e9-84b7-2cb94274c85a}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM P_Safety
+VAR
+
+	UR5Mode_pointer: POINTER TO BYTE;
+	UR5Mode: WORD;
+	mbReadUR5Mode : FB_mbReadRegs;
+	UR5Mode2: WORD;
+	
+	blinker: TON := (PT := T#500MS);
+	
+	fbUR5mode : FB_mbReadSingleReg;
+	fbUR3mode : FB_mbReadSingleReg;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// Handle Acknoledging Error and Reseting Safety PLC
+Global_Safety.ErrorAck := Global_Safety.ResetPB;
+
+// Get mode from UR5
+fbUR5Mode(	Robot := 'UR5',
+			Register := Global.ModeAddr);
+Global.stUR5.mode := fbUR5Mode.Value;
+
+// Get mode from UR3
+fbUR3Mode(	Robot := 'UR3',
+			Register := Global.ModeAddr);
+Global.stUR3.mode := fbUR3Mode.Value;
+
+// Monitor Robot Status for Stack Lights
+// RED - Robots Enabled (mode = 7)
+IF Global.stUR3.mode=7 THEN
+	Global_Safety.UR3RedIND := TRUE;
+ELSE
+	Global_Safety.UR3RedIND := FALSE;
+END_IF
+IF Global.stUR5.mode=7 THEN
+	Global_Safety.UR5RedIND := TRUE;
+ELSE
+	Global_Safety.UR5RedIND := FALSE;
+END_IF
+
+
+// AMBER - Safeguard Fault
+IF NOT Global_Safety.NotInEStop OR NOT Global_Safety.NotInRedSpeed OR NOT Global_Safety.NotInSafeStop THEN
+	Global_Safety.UR3AmberIND := TRUE;
+	Global_Safety.UR5AmberIND := TRUE;
+ELSE
+	Global_Safety.UR3AmberIND := FALSE;
+	Global_Safety.UR5AmberIND := FALSE;
+	// Control Pendant Indicator
+	Global_Safety.CPFaultIND := FALSE; // if no faults turn off fault indicator
+END_IF
+
+// GREEN - Safety Systems On
+IF Global_Safety.SafetyPLCState=1 THEN
+	Global_Safety.UR3GreenIND := TRUE;
+	Global_Safety.UR5GreenIND := TRUE;
+ELSE
+	Global_Safety.UR3GreenIND := FALSE;
+	Global_Safety.UR5GreenIND := FALSE;
+END_IF
+
+// BLUE - Some Safety Systems Disabled
+IF Global_Safety.ProgramModeActive THEN
+	Global_Safety.UR3BlueIND := TRUE;
+	Global_Safety.UR5BlueIND := TRUE;
+	// Control Pendant 
+	Global_Safety.CPEProgramModeIND := TRUE;
+ELSE
+	Global_Safety.UR3BlueIND := FALSE;
+	Global_Safety.UR5BlueIND := FALSE;
+	// Control Pendant 
+	Global_Safety.CPEProgramModeIND := FALSE;
+END_IF
+
+// Control Pendant Indicators
+IF NOT Global_Safety.NotInEStop THEN // if in estop
+	Global_Safety.CPEStopIND := TRUE; // turn on estop indicator
+	blinker(IN := NOT blinker.Q); // blink reset light
+	IF blinker.Q THEN // if timer went off and fault indicator not on 
+		Global_Safety.CPFaultIND := NOT Global_Safety.CPFaultIND; // turn on fault indicator
+	END_IF
+ELSE // if not in estop
+	Global_Safety.CPEStopIND := FALSE; // turn off estop indicator
+	IF NOT Global_Safety.NotInRedSpeed OR NOT Global_Safety.NotInSafeStop THEN
+		Global_Safety.CPFaultIND := TRUE; // if safe stop or red speed faults turn on fault indicator solid
+	END_IF
+END_IF
+
+
+]]></ST>
+    </Implementation>
+    <LineIds Name="P_Safety">
+      <LineId Id="232" Count="0" />
+      <LineId Id="322" Count="9" />
+      <LineId Id="233" Count="49" />
+      <LineId Id="308" Count="0" />
+      <LineId Id="283" Count="1" />
+      <LineId Id="304" Count="0" />
+      <LineId Id="307" Count="0" />
+      <LineId Id="285" Count="8" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

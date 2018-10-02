@@ -1,0 +1,191 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="FB_CSV_PartDataWriter" Id="{b4fd50d5-2c5c-4e2b-830c-05753b8949f2}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_CSV_PartDataWriter
+VAR_INPUT
+	bEnable: BOOL;
+	sFileName:	STRING;
+	stPartData : ST_Part;
+END_VAR
+VAR_OUTPUT
+	bBusy:	BOOL;
+	bError:	BOOL;
+	sError:	STRING;
+END_VAR
+VAR
+	fbFileOpen:	FB_FileOpen;
+	fbFilePuts:	FB_FilePuts;
+	fbFileClose:	FB_FileClose;
+	
+	rtWrite:	R_TRIG;
+	
+	nState:	INT;
+	sTempPathName:	STRING;
+	sDataString1:	STRING(255);
+	sDataString2:	STRING(255);
+	bFileOpen: BOOL;
+	
+	nLastPart: WORD;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[CASE nState OF
+	0:	(*IDLE*)
+		bBusy := FALSE;
+		// choose state		
+		IF bFileOpen AND NOT bEnable THEN
+			// close file
+			nState := 30;
+		END_IF
+		
+		IF nLastPart <> stPartData.nPartNumber THEN
+
+			sTempPathName := CONCAT(CONCAT('D:\PLCTempData\',sFileName),'.csv');
+			// Build Datastrings
+			// uint = 20 characters, word = 6 characters, bool = 5 characters, lword = 11
+			// 12 ulints = 240 bytes max string length of 255
+			sDataString1 := '';
+			sDataString1 := INSERT(sDataString1,CONCAT(WORD_TO_STRING(stPartData.nPartNumber),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(WORD_TO_STRING(stPartData.nWorkFixture),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(WORD_TO_STRING(stPartData.nInputPosition),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(WORD_TO_STRING(stPartData.nOutputPosition),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(WORD_TO_STRING(stPartData.nPartType),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(BOOL_TO_STRING(stPartData.bComplete),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(LWORD_TO_STRING(stPartData.rtUR3TimePartAdded),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(LWORD_TO_STRING(stPartData.rtUR5TimePartAdded),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(ULINT_TO_STRING(stPartData.ntPartAdded),','),LEN(sDataString1));
+ 			sDataString1 := INSERT(sDataString1,CONCAT(ULINT_TO_STRING(stPartData.ntPickFromInputAssigned),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(ULINT_TO_STRING(stPartData.ntInputPartPicked),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(ULINT_TO_STRING(stPartData.ntInputPartPlaced),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(ULINT_TO_STRING(stPartData.ntPlaceInWFComplete),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(ULINT_TO_STRING(stPartData.ntTaskAssigned),','),LEN(sDataString1));
+			sDataString1 := INSERT(sDataString1,CONCAT(ULINT_TO_STRING(stPartData.ntTaskActionStart),','),LEN(sDataString1));
+			
+			
+			// Second half of part data
+			sDataString2 := '';
+			sDataString2 := INSERT(sDataString2,CONCAT(ULINT_TO_STRING(stPartData.ntTaskActionComplete),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(ULINT_TO_STRING(stPartData.ntTaskComplete),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(ULINT_TO_STRING(stPartData.ntPickFromWFAssigned),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(ULINT_TO_STRING(stPartData.ntOutputPartPicked),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(ULINT_TO_STRING(stPartData.ntOutputPartPlaced),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(ULINT_TO_STRING(stPartData.ntPlaceInOutputComplete),','),LEN(sDataString2));
+			sDataString2 := INSERT(sDataString2,CONCAT(ULINT_TO_STRING(stPartData.ntPartRemoved),','),LEN(sDataString2));
+			sDataString2 := CONCAT(sDataString2,'$N');
+			
+			
+			// Keep track of new messages
+			nLastPart := stPartData.nPartNumber;
+			
+			// go to next state
+			IF bFileOpen THEN
+				// start writing strings
+				nState := 20;
+			ELSE
+				// open file
+				nState := 10;
+			END_IF
+		END_IF	
+		
+		// set variables
+		bError := FALSE;
+		sError := '';	
+	
+	10:	(*Open File*)	
+		fbFileOpen(	sPathName := sTempPathName,
+					nMode := FOPEN_MODEAPPEND,
+					bExecute := TRUE,
+					tTimeOut := T#1S);
+		IF NOT fbFileOpen.bBusy THEN
+			fbFileOpen(	bExecute := FALSE);
+			IF fbFileOpen.bError THEN
+				bError := TRUE;
+				sError := 'Could Not Open File';
+				nState := 0;
+			ELSE
+				nState := nState + 10;
+			END_IF
+		END_IF
+		
+	20:	(*Write Line To File*)
+		fbFilePuts(	hFile := fbFileOpen.hFile,
+					sLine := sDataString1,
+					bExecute := TRUE,
+					tTimeout := T#1S);
+		IF NOT fbFilePuts.bBusy THEN
+			fbFilePuts(	bExecute := FALSE);
+			IF fbFilePuts.bError THEN
+				bError := TRUE;
+				sError := 'Could not write to file';
+				nState := nState + 10;
+			ELSE
+				nState := nState + 1;
+			END_IF
+		END_IF
+	21:	(*Write Line To File*)
+		fbFilePuts(	hFile := fbFileOpen.hFile,
+					sLine := sDataString2,
+					bExecute := TRUE,
+					tTimeout := T#1S);
+		IF NOT fbFilePuts.bBusy THEN
+			fbFilePuts(	bExecute := FALSE);
+			IF fbFilePuts.bError THEN
+				bError := TRUE;
+				sError := 'Could not write to file';
+				nState := 30;
+			ELSE
+				nState := 30;
+			END_IF
+		END_IF
+		
+	30:	(*Close File*)
+		fbFileClose(	hFile := fbFileOpen.hFile,
+						bExecute := TRUE,
+						tTimeout := T#1S);
+		IF NOT fbFileClose.bBusy THEN
+			fbFileClose(	bExecute := FALSE);
+			IF fbFileClose.bError THEN
+				bError := TRUE;
+				sError := 'Could not close file';
+				nState := 0;
+			ELSE
+				nState := 0;
+			END_IF
+		END_IF
+END_CASE]]></ST>
+    </Implementation>
+    <LineIds Name="FB_CSV_PartDataWriter">
+      <LineId Id="12" Count="0" />
+      <LineId Id="243" Count="7" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="97" Count="0" />
+      <LineId Id="192" Count="0" />
+      <LineId Id="141" Count="0" />
+      <LineId Id="101" Count="0" />
+      <LineId Id="185" Count="5" />
+      <LineId Id="218" Count="1" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="96" Count="0" />
+      <LineId Id="98" Count="1" />
+      <LineId Id="102" Count="3" />
+      <LineId Id="108" Count="0" />
+      <LineId Id="140" Count="0" />
+      <LineId Id="160" Count="0" />
+      <LineId Id="216" Count="1" />
+      <LineId Id="191" Count="0" />
+      <LineId Id="184" Count="0" />
+      <LineId Id="109" Count="2" />
+      <LineId Id="17" Count="0" />
+      <LineId Id="115" Count="0" />
+      <LineId Id="256" Count="11" />
+      <LineId Id="22" Count="0" />
+      <LineId Id="272" Count="0" />
+      <LineId Id="269" Count="2" />
+      <LineId Id="23" Count="31" />
+      <LineId Id="142" Count="14" />
+      <LineId Id="55" Count="15" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

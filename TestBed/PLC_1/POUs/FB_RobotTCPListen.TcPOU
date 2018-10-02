@@ -1,0 +1,168 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <POU Name="FB_RobotTCPListen" Id="{8049a8bc-c88a-46b6-885c-8d0914a443b2}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM FB_RobotTCPListen
+VAR_INPUT
+	bEnable : BOOL;
+	Robot : STRING;
+END_VAR
+VAR_OUTPUT
+	bBusy : BOOL;
+	bConnected : BOOL;
+	bError : BOOL;
+END_VAR
+VAR
+	eState : E_RobotTCPListen;
+	StartTrigger : R_TRIG;
+	StopTrigger : F_TRIG;
+	
+	fbSocketConnect : FB_SocketConnect := (sSrvNetId := '', tTimeout := DEFAULT_ADS_TIMEOUT);
+	fbSocketClose : FB_SocketClose := (sSrvNetId := '', tTimeout := DEFAULT_ADS_TIMEOUT);
+	fbSocketReceive : FB_SocketReceive := (sSrvNetId := '', tTimeout := DEFAULT_ADS_TIMEOUT, cbLen := 800);
+	
+	
+	hSocket1: T_HSOCKET;
+	
+	data : ARRAY [0..800] OF BYTE;
+	
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// Execute interrupt checks
+StartTrigger(CLK := bEnable);
+StopTrigger(CLK := bEnable);
+
+CASE eState OF
+	eState.Idle:
+		IF StartTrigger.Q THEN
+			bBusy := TRUE;
+			eState := eState.Connect_Start;
+		ELSIF StopTrigger.Q THEN
+			eState := eState.Close_Start;
+		ELSIF bConnected THEN
+			eState := eState.Receive_Start;
+		END_IF
+	
+	eState.Connect_Start:
+		fbSocketConnect.bExecute := TRUE;
+		fbSocketConnect.nRemotePort := 30001;
+		IF Robot='UR3' THEN
+			fbSocketConnect.sRemoteHost := '192.168.1.3';
+		ELSIF Robot='UR5' THEN
+			fbSocketConnect.sRemoteHost := '192.168.1.5';
+		ELSE
+			eState := eState.HandleError;
+		END_IF
+		fbSocketConnect();
+		eState := eState.Connect_Wait;
+		
+	eState.Connect_Wait:
+		fbSocketConnect.bExecute := FALSE;	
+		IF fbSocketConnect.bError THEN
+			eState := eState.HandleError;
+		ELSIF NOT fbSocketConnect.bBusy THEN
+			bConnected := TRUE;
+			hSocket1 := fbSocketConnect.hSocket;
+			eState := eState.Idle;
+		END_IF
+		
+	eState.Receive_Start:
+		fbSocketReceive.bExecute := TRUE;
+		fbSocketReceive.hSocket := hSocket1;
+		fbSocketReceive.pDest := ADR(data);
+		eState := eState.Receive_Wait;
+	
+	eState.Receive_Wait:
+		fbSocketReceive.bExecute := FALSE;
+		IF fbSocketReceive.bError THEN
+			eState := eState.HandleError;
+		ELSIF NOT fbSocketReceive.bBusy THEN
+			eState := eState.Idle;
+		END_IF
+				
+	eState.Close_Start:
+		fbSocketClose.bExecute := TRUE;
+		fbSocketClose.hSocket := hSocket1;
+		eState := eState.Close_Wait;
+	
+	eState.Close_Wait:
+		fbSocketClose.bExecute := FALSE;
+		IF fbSocketClose.bError THEN
+				eState := eState.HandleError;
+		ELSIF NOT fbSocketClose.bBusy THEN
+			bConnected := FALSE;
+			MEMSET(ADR(hSocket1),0,SIZEOF(hSocket1));
+			bBusy := FALSE;
+			bError := FALSE;
+			eState := eState.Idle;
+		END_IF
+		
+	eState.HandleError:
+		bError := TRUE;
+		IF bConnected THEN
+			eState := eState.Close_Start;
+		ELSE
+			bBusy := FALSE;
+			eState := eState.Idle;
+		END_IF
+		
+END_CASE
+
+fbSocketConnect();
+fbSocketReceive();
+fbSocketClose();]]></ST>
+    </Implementation>
+    <LineIds Name="FB_RobotTCPListen">
+      <LineId Id="40" Count="1" />
+      <LineId Id="44" Count="0" />
+      <LineId Id="27" Count="1" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="103" Count="0" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="114" Count="2" />
+      <LineId Id="119" Count="0" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="32" Count="0" />
+      <LineId Id="64" Count="0" />
+      <LineId Id="33" Count="0" />
+      <LineId Id="67" Count="1" />
+      <LineId Id="83" Count="5" />
+      <LineId Id="48" Count="0" />
+      <LineId Id="110" Count="0" />
+      <LineId Id="72" Count="0" />
+      <LineId Id="70" Count="0" />
+      <LineId Id="141" Count="0" />
+      <LineId Id="104" Count="3" />
+      <LineId Id="113" Count="0" />
+      <LineId Id="112" Count="0" />
+      <LineId Id="108" Count="1" />
+      <LineId Id="63" Count="0" />
+      <LineId Id="58" Count="0" />
+      <LineId Id="121" Count="0" />
+      <LineId Id="127" Count="0" />
+      <LineId Id="129" Count="6" />
+      <LineId Id="138" Count="1" />
+      <LineId Id="122" Count="0" />
+      <LineId Id="59" Count="1" />
+      <LineId Id="92" Count="0" />
+      <LineId Id="150" Count="4" />
+      <LineId Id="168" Count="1" />
+      <LineId Id="155" Count="0" />
+      <LineId Id="157" Count="0" />
+      <LineId Id="162" Count="2" />
+      <LineId Id="156" Count="0" />
+      <LineId Id="94" Count="0" />
+      <LineId Id="61" Count="1" />
+      <LineId Id="143" Count="0" />
+      <LineId Id="145" Count="0" />
+      <LineId Id="147" Count="2" />
+      <LineId Id="146" Count="0" />
+      <LineId Id="34" Count="0" />
+      <LineId Id="29" Count="0" />
+      <LineId Id="77" Count="1" />
+      <LineId Id="81" Count="0" />
+      <LineId Id="97" Count="0" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

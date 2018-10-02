@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4020.12">
+  <DUT Name="E_UDPConnection" Id="{e52b5b9f-4af3-41af-bcdf-5fd44219b12f}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+TYPE E_UDPConnection :
+(
+	Idle,
+	Connect_Start,
+	Connect_Wait,
+	Request_Start,
+	Request_Wait,
+	Receive_Start,
+	Receive_Wait,
+	RecordData,
+	Close_Start,
+	Close_Wait,
+	HandleError
+);
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>
